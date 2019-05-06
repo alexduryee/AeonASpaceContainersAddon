@@ -337,6 +337,10 @@ function jsonArrayToDataTable(json_arr)
 	asItemTable.Columns:Add("item_id")
 	asItemTable.Columns:Add("series")
 	asItemTable.Columns:Add("profile")
+
+	-- hidden columns used for the ordering.
+	asItemTable.Columns:Add("hidden_container")
+	asItemTable.Columns:Add("hidden_indicator")
 	
 
 	for i = 1, #json_arr do
@@ -351,15 +355,32 @@ function jsonArrayToDataTable(json_arr)
 
 		local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
 		
-		-- this will extract the 'indicator: <number>' from the big json string
 		local indicator = ExtractProperty(jsonString, 'indicator')
 		-- old way of extracting the indicator, before I parsed the json string inside the json search result. Left there for historical purpose (and so I can reuse it at another moment if needed)
 		--string.match(jsonString, 'indicator\":\"([0-9]+)')
-		local typeEnum =  ExtractProperty(obj, 'type_enum_s')[1]
-		if indicator ~= nil then
-			-- concatenating the indicator with the container type.
-			typeEnum = typeEnum .. ' ' .. indicator
+		local containers =  ExtractProperty(obj, 'type_enum_s')
+		local container = nil
+		if containers ~= nil then
+			container = containers[1]
 		end
+
+		local typeEnum = nil
+		if indicator ~= nil and container ~= nil then
+			-- concatenating the indicator with the container type.
+			typeEnum = container .. ' ' .. indicator
+			if isnumeric(indicator) then
+				LogDebug('current indicator'.. indicator)
+				-- converting the indicator to a number for ordering purpose.
+				indicator = tonumber(indicator)
+			end
+		else
+			typeEnum = container
+			-- sor nil is not stored inside the hidden indicator column
+			indicator = 0
+		end
+
+		setItemNode(row, 'hidden_indicator', indicator)
+		setItemNode(row, 'hidden_container', container)
 		setItemNode(row, 'enumeration', typeEnum)
 		setItemNode(row, 'item_barcode', ExtractProperty(obj, 'barcode_u_sstr')[1])
 
@@ -394,7 +415,7 @@ function jsonArrayToDataTable(json_arr)
 end
 
 
-function GetBoxes(tab, itemQuery) --no overloading in lua so need to have a parameter that is tested for nil
+function GetBoxes(tab, itemQuery)
 		-- itemQuery specify which term was used for the search (call number or title), usefule for outputting the was "not found" message. 
 		LogDebug("Retrieving boxes.");
 		clearTable(asItemsGrid); --Clear item grid to avoid mixed series/items

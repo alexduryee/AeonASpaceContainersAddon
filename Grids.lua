@@ -144,5 +144,17 @@ function fillItemTable(gridControl)
 	gridColumn.Visible = true;
 	gridColumn.VisibleIndex = 8;
 	gridColumn.OptionsColumn.ReadOnly = true;
-	--gridColumn.SortOrder = Types["DevExpress.Data.ColumnSortOrder"].Ascending;
+
+
+	local gridColumn;
+	gridColumn = gridView.Columns:Add();
+	gridColumn.Caption = "[HIDDEN]";
+	gridColumn.FieldName = "hidden_indicator";
+	gridColumn.Name = "gcHidden_indicator";
+	gridColumn.Width = 50;
+	gridColumn.Visible = true;
+	-- trick I have found to make hidden columns: put this index as negative number
+	gridColumn.VisibleIndex = -1;
+	gridColumn.OptionsColumn.ReadOnly = true;
+	gridColumn.SortOrder = Types["DevExpress.Data.ColumnSortOrder"].Ascending;
 end

@@ -54,6 +54,13 @@ function isnumeric(val)
 	return string.match(val, "^[0-9]+$") ~= nil;
 end
 
+function isOnlyWhitespace(str)
+  if str ~= nil then
+    return str:gsub("%s+", "") == ''
+  end
+  return true
+end
+
 -- source: https://stackoverflow.com/questions/1426954/split-string-in-lua
 function split(inputstr, sep)
         if sep == nil then
