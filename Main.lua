@@ -12,34 +12,29 @@ settings["AddonVersion"] = globalInterfaceMngr.environment.Info.Version;
 settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion;
 
 
---LogDebug("Launching ASpace Basic Plugin");
---LogDebug("Loading Assemblies");
---LogDebug("Loading System Data Assembly");
+LogDebug("Launching ASpace Basic Plugin");
+LogDebug("Loading Assemblies");
+LogDebug("Loading System Data Assembly");
 luanet.load_assembly("System");
 luanet.load_assembly("System.Data");
 luanet.load_assembly("System.Net");
 luanet.load_assembly("DevExpress.Data");
 luanet.load_assembly("System.Windows.Forms");
 luanet.load_assembly("System.Threading.Tasks");
-luanet.load_assembly("DevExpress.XtraBars");
 luanet.load_assembly("AtlasSystems.Core");
 
---LogDebug("Loading .NET Types");
+LogDebug("Loading .NET Types");
 Types = {};
 Types["System.Data.DataTable"] = luanet.import_type("System.Data.DataTable");
 Types["System.Data.DataColumn"] = luanet.import_type("System.Data.DataColumn");
 Types["System.Data.DataSet"] = luanet.import_type("System.Data.DataSet");
 Types["System.Net.WebClient"] = luanet.import_type("System.Net.WebClient");
-Types["System.IO.StreamReader"] = luanet.import_type("System.IO.StreamReader");
-Types["System.IO.StringReader"] = luanet.import_type("System.IO.StringReader");
 Types["DevExpress.Data.ColumnSortOrder"] = luanet.import_type("DevExpress.Data.ColumnSortOrder");
 Types["System.Windows.Forms.Control"] = luanet.import_type("System.Windows.Forms.Control");
 Types["System.Threading.Tasks.Task"] = luanet.import_type("System.Threading.Tasks.Task");
 Types["System.Action"] = luanet.import_type("System.Action");
 Types["System.Console"] = luanet.import_type("System.Console");
-Types["DevExpress.XtraBars.BarItemVisibility"] = luanet.import_type("DevExpress.XtraBars.BarItemVisibility");
 Types["AtlasSystems.Configuration.Settings"] = luanet.import_type("AtlasSystems.Configuration.Settings");
-Types["System.Net.WebClient"] = luanet.import_type("System.Net.WebClient");
 Types["System.Collections.Specialized.NameValueCollection"] = luanet.import_type("System.Collections.Specialized.NameValueCollection");
 Types["System.Text.Encoding"] = luanet.import_type("System.Text.Encoding")
 
@@ -54,19 +49,12 @@ Ribbons = {};
 require("Helpers");
 require("EventHandlers");
 require("Grids");
-
-require "Atlas.AtlasHelpers"
 require "Atlas-Addons-Lua-ParseJson.JsonParser"
-local repo
 
 local form = nil;
 local interfaceMngr = nil;
 
 local mySqlGrid = nil;
-
-function EZPrint(thing)
-	interfaceMngr:ShowMessage(thing,'Brought to you by EZPrint')
-end
 
 function Init()
 
@@ -96,7 +84,7 @@ function Init()
 		asItemsGrid = form:CreateGrid("MySqlGrid", "ArchivesSpace Results");
 		asItemsGrid.GridControl.MainView.OptionsView.ShowGroupPanel = false;
 
-		numberSearchResult = form:CreateTextEdit("NumberSearchResult", "Number of item founds:");
+		numberSearchResult = form:CreateTextEdit("NumberSearchResult", "Number of item(s) found:");
 		numberSearchResult.ReadOnly = true;
 		numberSearchResult.Value = 0
 
@@ -123,7 +111,6 @@ function Init()
 
 	eadidTerm = form:CreateTextEdit('eadid', "EADID");
 	eadidTerm.Editor.KeyDown:Add(EADIDSubmitCheck)
-	
 
 
 	-- This specifies the layout of the different component of the addon (the grid, the ribbons etc..) the default placement being rather poor.
@@ -472,33 +459,40 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 		setFieldValueIfNotNil("Transaction", "ItemTitle", collectionTitle)
 
 		local res = getResourceByCallNumber(callNumber)
-		local creator = ExtractProperty(res, 'creators')[1]
-		setFieldValueIfNotNil("Transaction", "ItemAuthor", creator)
-		
-		
-		-- this does not work either, WTF
-		local resourceURL = ExtractProperty(res, 'id')
-		local resourceElems = split(resourceURL, '/')
-		local repoCode = getRepoCode(resourceElems[2])
-		local resourceId = resourceElems[#resourceElems]
-		setFieldValueIfNotNil("Transaction", "Location", repoCode)
+		-- a use case for res to be nil: if the resource is actually an accession.
+		if res ~= nil then
+			local creators = ExtractProperty(res, 'creators') 
+			local creator = nil
+			if creators ~= nil then
+				creator = creators[1]
+			end
+			setFieldValueIfNotNil("Transaction", "ItemAuthor", creator)
+			
+			local resourceURL = ExtractProperty(res, 'id')
+			local resourceElems = split(resourceURL, '/')
+			local repoCode = getRepoCode(resourceElems[2])
+			local resourceId = resourceElems[#resourceElems]
+			setFieldValueIfNotNil("Transaction", "Location", repoCode)
 
-		local resourceObj = getFullResourceById(resourceId)
-		local notes = ExtractProperty(resourceObj, 'notes')
-		
-		local a_id = extractNoteContent(notes, 'label', 'Alma ID', 'persistent_id')
-		if a_id == nil then
-			a_id = extractNoteContent(notes, 'label', 'Aleph ID', 'persistent_id')
+			local resourceObj = getFullResourceById(resourceId)
+			local notes = ExtractProperty(resourceObj, 'notes')
+			
+			local a_id = extractNoteContent(notes, 'label', 'Alma ID', 'subnotes')
+			if a_id == nil then
+				a_id = extractNoteContent(notes, 'label', 'Aleph ID', 'subnotes')
+			end
+			if a_id ~= nil then
+				a_id = ExtractProperty(a_id[1], 'content')
+			end
+			setFieldValueIfNotNil('Transaction', 'ReferenceNumber', a_id)
+			
+			-- the content of a physical location is an array.
+			local physicLocation = extractNoteContent(notes, 'type', 'physloc', 'content')
+			if physicLocation ~= nil then
+				physicLocation = physicLocation[1]
+			end
+			setFieldValueIfNotNil('Transaction', 'SubLocation', physicLocation)
 		end
-		setFieldValueIfNotNil('Transaction', 'ReferenceNumber', a_id)
-		
-		-- the content of a physical location is an array.
-		local physicLocation = extractNoteContent(notes, 'type', 'physloc', 'content')
-		if physicLocation ~= nil then
-			physicLocation = physicLocation[1]
-		end
-		setFieldValueIfNotNil('Transaction', 'SubLocation', physicLocation)
-
 	end
 
 	LogDebug("Switching to the detail tab.")
