@@ -28,6 +28,7 @@ Types = {};
 Types["System.Data.DataTable"] = luanet.import_type("System.Data.DataTable");
 Types["System.Data.DataColumn"] = luanet.import_type("System.Data.DataColumn");
 Types["System.Data.DataSet"] = luanet.import_type("System.Data.DataSet");
+Types["System.Data.DataView"] = luanet.import_type("System.Data.DataView");
 Types["System.Net.WebClient"] = luanet.import_type("System.Net.WebClient");
 Types["DevExpress.Data.ColumnSortOrder"] = luanet.import_type("DevExpress.Data.ColumnSortOrder");
 Types["System.Windows.Forms.Control"] = luanet.import_type("System.Windows.Forms.Control");
@@ -37,7 +38,8 @@ Types["System.Console"] = luanet.import_type("System.Console");
 Types["AtlasSystems.Configuration.Settings"] = luanet.import_type("AtlasSystems.Configuration.Settings");
 Types["System.Collections.Specialized.NameValueCollection"] = luanet.import_type("System.Collections.Specialized.NameValueCollection");
 Types["System.Text.Encoding"] = luanet.import_type("System.Text.Encoding")
-
+Types["System.Convert"] = luanet.import_type('System.Convert')
+Types['System.Int'] = luanet.import_type('System.Int')
 
 -- LogDebug("Create empty table for buttons");
 Buttons = {};
@@ -210,6 +212,9 @@ end
 
 function getTopContainersByEADID(eadid)
 	local callNumber = getResourceCallNumberByEADID(eadid)
+	if callNumber == nil then
+		return nil
+	end
 	return getTopContainersByCallNumber(callNumber)
 end
 
@@ -340,7 +345,7 @@ function jsonArrayToDataTable(json_arr)
 
 	-- hidden columns used for the ordering.
 	asItemTable.Columns:Add("hidden_container")
-	asItemTable.Columns:Add("hidden_indicator")
+	asItemTable.Columns:Add("hidden_indicator", Types['System.Int'])
 	
 
 	for i = 1, #json_arr do
@@ -356,8 +361,6 @@ function jsonArrayToDataTable(json_arr)
 		local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
 		
 		local indicator = ExtractProperty(jsonString, 'indicator')
-		-- old way of extracting the indicator, before I parsed the json string inside the json search result. Left there for historical purpose (and so I can reuse it at another moment if needed)
-		--string.match(jsonString, 'indicator\":\"([0-9]+)')
 		local containers =  ExtractProperty(obj, 'type_enum_s')
 		local container = nil
 		if containers ~= nil then
@@ -369,13 +372,11 @@ function jsonArrayToDataTable(json_arr)
 			-- concatenating the indicator with the container type.
 			typeEnum = container .. ' ' .. indicator
 			if isnumeric(indicator) then
-				LogDebug('current indicator'.. indicator)
-				-- converting the indicator to a number for ordering purpose.
 				indicator = tonumber(indicator)
 			end
 		else
 			typeEnum = container
-			-- sor nil is not stored inside the hidden indicator column
+			-- sort nil is not stored inside the hidden indicator column
 			indicator = 0
 		end
 
@@ -411,7 +412,14 @@ function jsonArrayToDataTable(json_arr)
 		local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
 		setItemNode(row, 'profile', profile)
 	end
-	return asItemTable
+
+	--interfaceMngr:ShowMessage(asItemTable.Columns['hidden_indicator'].DataType.FullName, 'the type is')
+
+	-- this was the only way I found a way to have the DataTable be sorted before being on the grid (lack of Atlas documentation on how to do the grid sorting)
+	dtView = Types['System.Data.DataView'](asItemTable)
+	-- first the callnumber, then the container name (volume or box?), then 
+	dtView.Sort = ' callNumber ASC, hidden_container ASC, hidden_indicator ASC, container ASC'
+	return dtView:ToTable()
 end
 
 
@@ -651,7 +659,7 @@ function SendApiRequest(apiPath, method, parameters, authToken)
 
         local utf8Result = Types["System.Text.Encoding"].UTF8:GetString(result);
 
-        LogDebug("Response: " .. utf8Result);
+        --LogDebug("Response: " .. utf8Result);
         return utf8Result;
     else
         LogDebug("API call error");

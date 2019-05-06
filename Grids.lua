@@ -156,5 +156,5 @@ function fillItemTable(gridControl)
 	-- trick I have found to make hidden columns: put this index as negative number
 	gridColumn.VisibleIndex = -1;
 	gridColumn.OptionsColumn.ReadOnly = true;
-	gridColumn.SortOrder = Types["DevExpress.Data.ColumnSortOrder"].Ascending;
+	--gridColumn.SortOrder = Types["DevExpress.Data.ColumnSortOrder"].Ascending;
 end
