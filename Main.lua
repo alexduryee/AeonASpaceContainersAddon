@@ -202,12 +202,12 @@ function getResourceByCallNumber(callNumb)
 end
 
 function getTopContainersByCallNumber(callNumb)
-	return getTopContainersBySearchQuery('q=collection:identifier:("'..callNumb..'")')
+	return getTopContainersBySearchQuery('q=collection_identifier_u_stext:("'..callNumb..'")')
 end
 
 
 function getTopContainersByTitle(title)
-	return getTopContainersBySearchQuery('q=collection:display_string:("'..title..'")')
+	return getTopContainersBySearchQuery('q=collection_display_string_u_sstr:("'..title..'")')
 end
 
 function getTopContainersByEADID(eadid)
@@ -239,7 +239,7 @@ function getTopContainersBySearchQuery(searchQuery)
 end
 
 function getResourceCallNumberByEADID(eadid)
-	local searchResourceReq = 'repositories/' .. settings['RepoID'] .. '/search?page=1&q=eadid:("' .. eadid .. '")&type[]=resource'
+	local searchResourceReq = 'repositories/' .. settings['RepoID'] .. '/search?page=1&q=ead_id:("' .. eadid .. '")&type[]=resource'
 	local res = getElementBySearchQuery(searchResourceReq)
 
 	-- to reformat
@@ -345,7 +345,7 @@ function jsonArrayToDataTable(json_arr)
 
 	-- hidden columns used for the ordering.
 	asItemTable.Columns:Add("hidden_container")
-	asItemTable.Columns:Add("hidden_indicator", Types['System.Int'])
+	asItemTable.Columns:Add("hidden_indicator")--, Types['System.Int'])
 	
 
 	for i = 1, #json_arr do
@@ -418,7 +418,7 @@ function jsonArrayToDataTable(json_arr)
 	-- this was the only way I found a way to have the DataTable be sorted before being on the grid (lack of Atlas documentation on how to do the grid sorting)
 	dtView = Types['System.Data.DataView'](asItemTable)
 	-- first the callnumber, then the container name (volume or box?), then 
-	dtView.Sort = ' callNumber ASC, hidden_container ASC, hidden_indicator ASC, container ASC'
+	--dtView.Sort = ' callNumber ASC, hidden_container ASC, hidden_indicator ASC, container ASC'
 	return dtView:ToTable()
 end
 
