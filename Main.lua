@@ -211,7 +211,8 @@ function getTopContainersByTitle(title)
 end
 
 function getTopContainersByEADID(eadid)
-	local callNumber = getResourceCallNumberByEADID(eadid)
+	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive.
+	local callNumber = getResourceCallNumberByEADID(eadid:lower())
 	if callNumber == nil then
 		return nil
 	end
