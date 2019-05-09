@@ -383,6 +383,8 @@ function jsonArrayToDataTable(json_arr)
 			typeEnum = container .. ' ' .. indicator
 			if isnumeric(indicator) then
 				indicator = tonumber(indicator)
+			else
+				indicator = 0
 			end
 		else
 			typeEnum = container
@@ -410,12 +412,18 @@ function jsonArrayToDataTable(json_arr)
 		setItemNode(row, 'item_id', tcId[#tcId])
 		asItemTable.Rows:Add(row)
 
-		local seriesArray = ExtractProperty(obj, 'series')
 		local seriesStr = ''
+		local seriesArray = ExtractProperty(jsonString, 'series')
 		if #seriesArray > 0 then
-			for i = 1,#seriesArray do
-				seriesStr = seriesStr .. seriesArray[i]
+			seriesStr = ExtractProperty(seriesArray[1], 'display_string')
+
+			for i = 2,#seriesArray do
+				local displayString = ExtractProperty(seriesArray[i], 'display_string')
+				if displayString ~= '' and displayString ~= nil then
+					seriesStr = seriesStr .. '; ' .. displayString
+				end
 			end 
+			seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
 		end
 		setItemNode(row, 'series', seriesStr)
 
@@ -423,12 +431,11 @@ function jsonArrayToDataTable(json_arr)
 		setItemNode(row, 'profile', profile)
 	end
 
-	--interfaceMngr:ShowMessage(asItemTable.Columns['hidden_indicator'].DataType.FullName, 'the type is')
 
 	-- this was the only way I found a way to have the DataTable be sorted before being on the grid (lack of Atlas documentation on how to do the grid sorting)
 	dtView = Types['System.Data.DataView'](asItemTable)
 	-- first the callnumber, then the container name (volume or box?), then 
-	--dtView.Sort = ' callNumber ASC, hidden_container ASC, hidden_indicator ASC, container ASC'
+	dtView.Sort = 'callNumber ASC, hidden_container ASC, hidden_indicator ASC, enumeration ASC'
 	return dtView:ToTable()
 end
 
