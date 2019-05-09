@@ -15,6 +15,8 @@ settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion;
 LogDebug("Launching ASpace Basic Plugin");
 LogDebug("Loading Assemblies");
 LogDebug("Loading System Data Assembly");
+--this one is to get INt32 
+luanet.load_assembly("mscorlib")
 luanet.load_assembly("System");
 luanet.load_assembly("System.Data");
 luanet.load_assembly("System.Net");
@@ -38,8 +40,8 @@ Types["System.Console"] = luanet.import_type("System.Console");
 Types["AtlasSystems.Configuration.Settings"] = luanet.import_type("AtlasSystems.Configuration.Settings");
 Types["System.Collections.Specialized.NameValueCollection"] = luanet.import_type("System.Collections.Specialized.NameValueCollection");
 Types["System.Text.Encoding"] = luanet.import_type("System.Text.Encoding")
-Types["System.Convert"] = luanet.import_type('System.Convert')
-Types['System.Int'] = luanet.import_type('System.Int')
+Types['System.Int32'] = luanet.import_type('System.Int32')
+--ctype = luanet.ctype
 
 -- LogDebug("Create empty table for buttons");
 Buttons = {};
@@ -47,7 +49,6 @@ Buttons = {};
 -- LogDebug("Create empty table for ribbons");
 Ribbons = {};
 
---LogDebug("Load additional lua libraries");
 require("Helpers");
 require("EventHandlers");
 require("Grids");
@@ -72,7 +73,7 @@ function Init()
 	settings["RepoID"] = getRepoId(settings["RepoCode"])
 
 	if settings["RepoID"] == nil or settings["RepoID"] == '' then
-		interfaceMngr:ShowMessage('The repository ID could not be retrieved for the current repository code: '.. settings["RepoCode"], 'error')
+		interfaceMngr:ShowMessage('The repository ID could not be retrieved for the current repository code: '.. settings["RepoCode"], 'Error')
 		return
 	end
 	
@@ -285,8 +286,6 @@ end
 function getRepoCode(repoID)
 	local searchResourceReq = 'repositories/' .. repoID
 	local res = getElementBySearchQuery(searchResourceReq)
-
-	-- to reformat
 	return ExtractProperty(res, "repo_code")
 end
 
@@ -346,7 +345,13 @@ function jsonArrayToDataTable(json_arr)
 
 	-- hidden columns used for the ordering.
 	asItemTable.Columns:Add("hidden_container")
-	asItemTable.Columns:Add("hidden_indicator")--, Types['System.Int'])
+	--interfaceMngr:ShowMessage(tostring(Types['System.Int32'].proxy), 'systemint32')
+	asItemTable.Columns:Add("hidden_indicator")--, luanet.ctype(Types['System.Int32']))
+
+	--hcColumn = Types['System.Data.DataColumn']('hidden_indicator')
+	--hcColumn.DataType = Types['System.Type']:GetType("System.Int32")
+	--asItemTable:Add(hcColumn)
+	--interfaceMngr:ShowMessage(asItemTable.Columns['hidden_indicator'].DataType, 'curr type')
 	
 
 	for i = 1, #json_arr do
@@ -522,6 +527,17 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 				physicLocation = physicLocation[1]
 			end
 			setFieldValueIfNotNil('Transaction', 'SubLocation', physicLocation)
+
+
+			local accessRestrictNotes = extractNoteContent(notes, 'type', 'accessrestrict', 'subnotes')
+			if accessRestrictNotes and #accessRestrictNotes > 0 then
+				local subnoteContent = ExtractProperty(accessRestrictNotes[1], 'content')
+				if subnoteContent then
+					-- Aeon Transaction fields 
+					local truncated = subnoteContent:sub(0, 255)
+					setFieldValueIfNotNil('Transaction', 'ItemInfo2', truncated)
+				end				
+			end
 		end
 	end
 
@@ -529,7 +545,6 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	ExecuteCommand("SwitchTab", {"Detail"})
 end
 
--- Andrew F. Brimmers papers
 
 function extractNoteContent(notesArray, jsonField, fieldValue, toExtract)
 	for i = 1, #notesArray do
