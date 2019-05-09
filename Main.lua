@@ -159,6 +159,10 @@ function containersSearch()
 		return
 	end
 
+	local gridControl = asItemsGrid.GridControl
+	-- this is a way to have some 'loading' info displayed to the user
+	noSearchResult(gridControl, 'Fetching search results, please wait')
+
 	if titleIsFilled then
 		performSearch(collectionTitle, 'title')
 	elseif eadIsFilled then

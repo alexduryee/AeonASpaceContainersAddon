@@ -21,7 +21,6 @@ end
 
 
 function performSearch(field, fieldName)
-	checkRepoCode()
 	if field.Value == nil or field.Value == '' then
 		LogDebug('Containers '.. fieldName ..' search run but no search term provided')
 	else
