@@ -185,7 +185,6 @@ function getResourceIdByCallNumber(callNumb)
 	pathSplit = split(resource_id, '/')
 	actual_id = pathSplit[#pathSplit]
 	return actual_id
-
 end
 
 
@@ -331,41 +330,27 @@ function setItemNode(itemRow, aeonField, data)
 end
 
 function jsonArrayToDataTable(json_arr)
+
 	local asItemTable = Types["System.Data.DataTable"]()
 
 	if json_arr == nil then
 		return asItemTable
 	end
-
-	asItemTable.Columns:Add("collectionTitle")
-	asItemTable.Columns:Add("callNumber")
-	asItemTable.Columns:Add("enumeration")
-	asItemTable.Columns:Add("item_barcode")
-	asItemTable.Columns:Add("location")
-	asItemTable.Columns:Add("restrictions")
-	asItemTable.Columns:Add("item_id")
-	asItemTable.Columns:Add("series")
-	asItemTable.Columns:Add("profile")
-
-	-- hidden columns used for the ordering.
-	asItemTable.Columns:Add("hidden_container")
-	--interfaceMngr:ShowMessage(tostring(Types['System.Int32'].proxy), 'systemint32')
-	asItemTable.Columns:Add("hidden_indicator")--, luanet.ctype(Types['System.Int32']))
-
-	--hcColumn = Types['System.Data.DataColumn']('hidden_indicator')
-	--hcColumn.DataType = Types['System.Type']:GetType("System.Int32")
-	--asItemTable:Add(hcColumn)
-	--interfaceMngr:ShowMessage(asItemTable.Columns['hidden_indicator'].DataType, 'curr type')
 	
+	function setItemTable(tab, fieldName, fieldValue)
+		tab[fieldName] = fieldValue
+		return tab
+	end
 
+	local allRecords = {}
 	for i = 1, #json_arr do
 		local obj = json_arr[i]
-		local row = asItemTable:NewRow()
+		local row = {}
 		
 		-- I have been checking all the Call number in ASPace, none of them had a comma.
-		setItemNode(row, 'callNumber', split(ExtractProperty(obj, 'title'), ',')[1])
+		setItemTable(row, 'callNumber', split(ExtractProperty(obj, 'title'), ',')[1])
 
-		setItemNode(row, 'collectionTitle', ExtractProperty(obj, 'collection_display_string_u_sstr')[1])
+		setItemTable(row, 'collectionTitle', ExtractProperty(obj, 'collection_display_string_u_sstr')[1])
 
 
 		local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
@@ -387,30 +372,33 @@ function jsonArrayToDataTable(json_arr)
 				indicator = 0
 			end
 		else
+			if not container then
+				-- failsafe so the sorting works later.
+				container = ''
+			end
 			typeEnum = container
 			-- sort nil is not stored inside the hidden indicator column
 			indicator = 0
 		end
 
-		setItemNode(row, 'hidden_indicator', indicator)
-		setItemNode(row, 'hidden_container', container)
-		setItemNode(row, 'enumeration', typeEnum)
-		setItemNode(row, 'item_barcode', ExtractProperty(obj, 'barcode_u_sstr')[1])
+		setItemTable(row, 'hidden_indicator', indicator)
+		setItemTable(row, 'hidden_container', container)
+		setItemTable(row, 'enumeration', typeEnum)
+		setItemTable(row, 'item_barcode', ExtractProperty(obj, 'barcode_u_sstr')[1])
 
 		-- apparently some locations can be empty!
-		setItemNode(row, 'location', ExtractProperty(obj, 'location_display_string_u_sstr')[1])
+		setItemTable(row, 'location', ExtractProperty(obj, 'location_display_string_u_sstr')[1])
 
 		-- fetching this information from the 'restricted' field of the json embedded data 
 		local restricted = 'N'
 		if ExtractProperty(jsonString, 'restricted') then
 			restricted = 'Y'
 		end
-		setItemNode(row, 'restrictions', restricted)
+		setItemTable(row, 'restrictions', restricted)
 		
 		-- all the ids are 
 		tcId = split(ExtractProperty(obj, 'id'), '/')
-		setItemNode(row, 'item_id', tcId[#tcId])
-		asItemTable.Rows:Add(row)
+		setItemTable(row, 'item_id', tcId[#tcId])
 
 		local seriesStr = ''
 		local seriesArray = ExtractProperty(jsonString, 'series')
@@ -425,20 +413,62 @@ function jsonArrayToDataTable(json_arr)
 			end 
 			seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
 		end
-		setItemNode(row, 'series', seriesStr)
+		setItemTable(row, 'series', seriesStr)
 
 		local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
-		setItemNode(row, 'profile', profile)
+		setItemTable(row, 'profile', profile)
+		allRecords[i] = row
 	end
 
 
-	-- this was the only way I found a way to have the DataTable be sorted before being on the grid (lack of Atlas documentation on how to do the grid sorting)
-	dtView = Types['System.Data.DataView'](asItemTable)
-	-- first the callnumber, then the container name (volume or box?), then 
-	dtView.Sort = 'callNumber ASC, hidden_container ASC, hidden_indicator ASC, enumeration ASC'
-	return dtView:ToTable()
-end
+	-- "This order function receives two arguments and must return true if the first argument should come first in the sorted array."
+	function sortingByCallNumberContainerIndicator(tab1, tab2)
+		-- this assumes that the title of the json object is in the following format: "<callNumber>, <ContainterType> <ContainerNumber> [...]"
 
+		local cn1, cont1, indic1 = tab1['callNumber'], tab1['hidden_container'], tab1['hidden_indicator']
+		local cn2, cont2, indic2 = tab2['callNumber'], tab2['hidden_container'], tab2['hidden_indicator']
+		if cn1 ~= cn2 then
+			return cn1 < cn2
+		elseif cont1 ~= cont2 then
+			return cont1 < cont2
+		else
+			-- some indicators might still be string
+			if type(indic1) == type(indic2) then
+				return indic1 < indic2
+			else
+				return false
+			end
+		end
+	end
+
+	table.sort(allRecords, sortingByCallNumberContainerIndicator)
+
+	asItemTable.Columns:Add("collectionTitle")
+	asItemTable.Columns:Add("callNumber")
+	asItemTable.Columns:Add("enumeration")
+	asItemTable.Columns:Add("item_barcode")
+	asItemTable.Columns:Add("location")
+	asItemTable.Columns:Add("restrictions")
+	asItemTable.Columns:Add("item_id")
+	asItemTable.Columns:Add("series")
+	asItemTable.Columns:Add("profile")
+
+	for _, value in ipairs(allRecords) do
+		local row = asItemTable:NewRow()
+		setItemNode(row,'collectionTitle', value['collectionTitle'])
+		setItemNode(row,'callNumber', value['callNumber'])
+		setItemNode(row,'enumeration', value['enumeration'])
+		setItemNode(row,'item_barcode', value['item_barcode'])
+		setItemNode(row,'location', value['location'])
+		setItemNode(row,'restrictions', value['restrictions'])
+		setItemNode(row,'item_id', value['item_id'])
+		setItemNode(row,'series', value['series'])
+		setItemNode(row,'profile', value['profile'])
+		asItemTable.Rows:Add(row)
+	end
+
+	return asItemTable
+end
 
 function GetBoxes(tab, itemQuery)
 		-- itemQuery specify which term was used for the search (call number or title), usefule for outputting the was "not found" message. 
@@ -689,6 +719,11 @@ function SendApiRequest(apiPath, method, parameters, authToken)
         --LogDebug("Response: " .. utf8Result);
         return utf8Result;
     else
+    	LogDebug('Type of the answer:'..type(result))
+    	LogDebug('Content of the answer:'.. result:ToString())
+    	if ExtractProperty(result, 'code') == 'SESSION_GONE' then
+    		return '412'
+    	end
         LogDebug("API call error");
         s = OnError(result);
         -- a message '(412) Precondition Failed' is crafted from OnError if the Session Id was wrong
