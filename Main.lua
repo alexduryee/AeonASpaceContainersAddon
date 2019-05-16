@@ -1,68 +1,48 @@
 settings = {} --settings is a global to allow other lua files access
-settings["TabName"] = GetSetting("TabName");
-settings["APIUrl"] = GetSetting("APIUrl");
-settings["Password"] = GetSetting("APIPassword");
-settings["Username"] = GetSetting("APIUsername");
-settings["RepoCode"] = GetSetting("RepoCode");
+settings["TabName"] = GetSetting("TabName") 
+settings["APIUrl"] = GetSetting("APIUrl") 
+settings["Password"] = GetSetting("APIPassword") 
+settings["Username"] = GetSetting("APIUsername") 
+settings["RepoCode"] = GetSetting("RepoCode") 
 
 -- Logging needs to precede all but settings to enable supporting libraries to log
-globalInterfaceMngr = GetInterfaceManager();
-settings["AddonName"] = globalInterfaceMngr.environment.Info.Name;
-settings["AddonVersion"] = globalInterfaceMngr.environment.Info.Version;
-settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion;
+globalInterfaceMngr = GetInterfaceManager() 
+settings["AddonName"] = globalInterfaceMngr.environment.Info.Name 
+settings["AddonVersion"] = globalInterfaceMngr.environment.Info.Version 
+settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion 
 
 
-LogDebug("Launching ASpace Basic Plugin");
-LogDebug("Loading Assemblies");
-LogDebug("Loading System Data Assembly");
---this one is to get INt32 
-luanet.load_assembly("mscorlib")
-luanet.load_assembly("System");
-luanet.load_assembly("System.Data");
-luanet.load_assembly("System.Net");
-luanet.load_assembly("DevExpress.Data");
-luanet.load_assembly("System.Windows.Forms");
-luanet.load_assembly("System.Threading.Tasks");
-luanet.load_assembly("AtlasSystems.Core");
+LogDebug("Launching ASpace Basic Plugin") 
+LogDebug("Loading Assemblies") 
+LogDebug("Loading System Data Assembly") 
 
-LogDebug("Loading .NET Types");
-Types = {};
-Types["System.Data.DataTable"] = luanet.import_type("System.Data.DataTable");
-Types["System.Data.DataColumn"] = luanet.import_type("System.Data.DataColumn");
-Types["System.Data.DataSet"] = luanet.import_type("System.Data.DataSet");
-Types["System.Data.DataView"] = luanet.import_type("System.Data.DataView");
-Types["System.Net.WebClient"] = luanet.import_type("System.Net.WebClient");
-Types["DevExpress.Data.ColumnSortOrder"] = luanet.import_type("DevExpress.Data.ColumnSortOrder");
-Types["System.Windows.Forms.Control"] = luanet.import_type("System.Windows.Forms.Control");
-Types["System.Threading.Tasks.Task"] = luanet.import_type("System.Threading.Tasks.Task");
-Types["System.Action"] = luanet.import_type("System.Action");
-Types["System.Console"] = luanet.import_type("System.Console");
-Types["AtlasSystems.Configuration.Settings"] = luanet.import_type("AtlasSystems.Configuration.Settings");
-Types["System.Collections.Specialized.NameValueCollection"] = luanet.import_type("System.Collections.Specialized.NameValueCollection");
+luanet.load_assembly("System") 
+luanet.load_assembly("System.Data") 
+luanet.load_assembly("System.Net") 
+
+LogDebug("Loading .NET Types") 
+Types = {} 
+Types["System.Data.DataTable"] = luanet.import_type("System.Data.DataTable") 
+Types["System.Data.DataColumn"] = luanet.import_type("System.Data.DataColumn") 
+Types["System.Net.WebClient"] = luanet.import_type("System.Net.WebClient") 
+Types["System.Collections.Specialized.NameValueCollection"] = luanet.import_type("System.Collections.Specialized.NameValueCollection") 
 Types["System.Text.Encoding"] = luanet.import_type("System.Text.Encoding")
-Types['System.Int32'] = luanet.import_type('System.Int32')
---ctype = luanet.ctype
 
--- LogDebug("Create empty table for buttons");
-Buttons = {};
+Buttons = {} 
+Ribbons = {} 
 
--- LogDebug("Create empty table for ribbons");
-Ribbons = {};
-
-require("Helpers");
-require("EventHandlers");
-require("Grids");
+require("Helpers") 
+require("EventHandlers") 
+require("Grids") 
 require "Atlas-Addons-Lua-ParseJson.JsonParser"
 
-local form = nil;
-local interfaceMngr = nil;
-
-local mySqlGrid = nil;
+local form = nil 
+local interfaceMngr = nil 
 
 function Init()
 
-	interfaceMngr = GetInterfaceManager();
-	form = interfaceMngr:CreateForm(settings.TabName, settings.TabName);
+	interfaceMngr = GetInterfaceManager() 
+	form = interfaceMngr:CreateForm(settings.TabName, settings.TabName) 
 
 	settings['sessionID'] = GetSessionId()
 	if settings['sessionID'] == nil then
@@ -77,18 +57,18 @@ function Init()
 		return
 	end
 	
-	Ribbons["CN"] = form:CreateRibbonPage("Container Search");
+	Ribbons["CN"] = form:CreateRibbonPage("Container Search") 
 
 	if (AddonInfo.CurrentForm == "FormRequest") then
-		Buttons["CNS-ICaC"] = Ribbons["CN"]:CreateButton("Import Container and Citation", GetClientImage("impt_32x32"), "importContainerAndCitation", "Container Search");
-		Buttons["CNS-IC"] = Ribbons["CN"]:CreateButton("Import Container", GetClientImage("impt_32x32"), "importContainer", "Container Search");
-		Buttons["CNS-PS"] = Ribbons["CN"]:CreateButton("Perform Search", GetClientImage("srch_32x32"), "containersSearch", "Container Search");
+		Buttons["CNS-ICaC"] = Ribbons["CN"]:CreateButton("Import Container and Citation", GetClientImage("impt_32x32"), "importContainerAndCitation", "Container Search") 
+		Buttons["CNS-IC"] = Ribbons["CN"]:CreateButton("Import Container", GetClientImage("impt_32x32"), "importContainer", "Container Search") 
+		Buttons["CNS-PS"] = Ribbons["CN"]:CreateButton("Perform Search", GetClientImage("srch_32x32"), "containersSearch", "Container Search") 
 		
-		asItemsGrid = form:CreateGrid("MySqlGrid", "ArchivesSpace Results");
-		asItemsGrid.GridControl.MainView.OptionsView.ShowGroupPanel = false;
+		asItemsGrid = form:CreateGrid("MySqlGrid", "ArchivesSpace Results") 
+		asItemsGrid.GridControl.MainView.OptionsView.ShowGroupPanel = false 
 
-		numberSearchResult = form:CreateTextEdit("NumberSearchResult", "Number of item(s) found:");
-		numberSearchResult.ReadOnly = true;
+		numberSearchResult = form:CreateTextEdit("NumberSearchResult", "Number of item(s) found:") 
+		numberSearchResult.ReadOnly = true 
 		numberSearchResult.Value = 0
 
 	end
@@ -100,26 +80,26 @@ function Init()
 	end
 
 	--Build the "Request" TextEdit Box
-	searchTerm = form:CreateTextEdit("Search", "Call Number");
+	searchTerm = form:CreateTextEdit("Search", "Call Number") 
 	searchTerm.Value = callNumber
-	searchTerm.Editor.KeyDown:Add(CallNumberSubmitCheck);
+	searchTerm.Editor.KeyDown:Add(CallNumberSubmitCheck) 
 
 
 	--Add a spot for collection title
-	collectionTitle = form:CreateTextEdit("CollectionTitle", "Collection Title");
+	collectionTitle = form:CreateTextEdit("CollectionTitle", "Collection Title") 
 	if title ~= nil then
 		collectionTitle.Value = title
 	end
-	collectionTitle.Editor.KeyDown:Add(TitleSubmitCheck);
+	collectionTitle.Editor.KeyDown:Add(TitleSubmitCheck) 
 
-	eadidTerm = form:CreateTextEdit('eadid', "EADID");
+	eadidTerm = form:CreateTextEdit('eadid', "EADID") 
 	eadidTerm.Editor.KeyDown:Add(EADIDSubmitCheck)
 
 
 	-- This specifies the layout of the different component of the addon (the grid, the ribbons etc..) the default placement being rather poor.
-	form:LoadLayout("layout.xml");
+	form:LoadLayout("layout.xml") 
 
-	form:Show();
+	form:Show() 
 	local result = nil 
 	local searchTypeStr = 'call number'
 
@@ -215,7 +195,7 @@ function getTopContainersByTitle(title)
 end
 
 function getTopContainersByEADID(eadid)
-	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive.
+	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
 	local callNumber = getResourceCallNumberByEADID(eadid:lower())
 	if callNumber == nil then
 		return nil
@@ -276,13 +256,13 @@ function getElementBySearchQuery(searchQuery)
 end
 
 function checkRepoCode()
-	repoCode = GetFieldValue("Transaction", "Location");
+	repoCode = GetFieldValue("Transaction", "Location") 
 	if repoCode == nil or repoCode == '' then
 		return -- in a hypothetical request with no repo code. 
 	end
 	if repoCode ~= settings['RepoCode'] then
 		interfaceMngr:ShowMessage('You are not authorized to make top containers search on this repository', 'Warning')
-		return;
+		return 
 	end
 end
 
@@ -308,8 +288,8 @@ end
 
 function setItemNode(itemRow, aeonField, data)
     local success, err = pcall(function()
-        itemRow:set_Item(aeonField, data);
-    end);
+        itemRow:set_Item(aeonField, data) 
+    end) 
 
     if success then
     	if data ~= nil then
@@ -323,10 +303,10 @@ function setItemNode(itemRow, aeonField, data)
         else
         	LogDebug('Error setting '..aeonField)
         end
-        LogDebug("Error: ".. err.code);
+        LogDebug("Error: ".. err.code) 
     end
 
-    return itemRow;
+    return itemRow 
 end
 
 function jsonArrayToDataTable(json_arr)
@@ -408,7 +388,7 @@ function jsonArrayToDataTable(json_arr)
 			for i = 2,#seriesArray do
 				local displayString = ExtractProperty(seriesArray[i], 'display_string')
 				if displayString ~= '' and displayString ~= nil then
-					seriesStr = seriesStr .. '; ' .. displayString
+					seriesStr = seriesStr .. '  ' .. displayString
 				end
 			end 
 			seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
@@ -472,22 +452,22 @@ end
 
 function GetBoxes(tab, itemQuery)
 		-- itemQuery specify which term was used for the search (call number or title), usefule for outputting the was "not found" message. 
-		LogDebug("Retrieving boxes.");
-		clearTable(asItemsGrid); --Clear item grid to avoid mixed series/items
+		LogDebug("Retrieving boxes.") 
+		clearTable(asItemsGrid)  --Clear item grid to avoid mixed series/items
 		
 		numberSearchResult.Value = tab.Rows.Count -- for the user to see the number of search results
-		local itemGridControl = asItemsGrid.GridControl;
+		local itemGridControl = asItemsGrid.GridControl 
 		if (tab.Rows.Count ~= 0) then
 			itemGridControl:BeginUpdate()
-			--asItemsGrid.PrimaryTable = tab;
+			--asItemsGrid.PrimaryTable = tab 
 			itemGridControl.DataSource=tab
 			itemGridControl:EndUpdate()
 
-			fillItemTable(itemGridControl);
-			asItemsGrid.GridControl:Focus();
+			fillItemTable(itemGridControl) 
+			asItemsGrid.GridControl:Focus() 
 		else
 			noSearchResult(itemGridControl, 'No top containers were found for the current '..itemQuery)
-			LogDebug("No results returned from webservice on box search");
+			LogDebug("No results returned from webservice on box search") 
 		end
 end
 
@@ -523,14 +503,14 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 		end 
 	end
 
-	LogDebug("Updating the item object.");
-	setFieldValueIfNotNil("Transaction", "ItemVolume", itemVolume);
-	setFieldValueIfNotNil("Transaction", "ItemNumber", barcode);
-	setFieldValueIfNotNil("Transaction", "ItemInfo5", location);
+	LogDebug("Updating the item object.") 
+	setFieldValueIfNotNil("Transaction", "ItemVolume", itemVolume) 
+	setFieldValueIfNotNil("Transaction", "ItemNumber", barcode) 
+	setFieldValueIfNotNil("Transaction", "ItemInfo5", location) 
 	
 
 	if withCitation then
-		setFieldValueIfNotNil("Transaction", "CallNumber", callNumber);
+		setFieldValueIfNotNil("Transaction", "CallNumber", callNumber) 
 		setFieldValueIfNotNil("Transaction", "ItemCitation", series)
 		setFieldValueIfNotNil("Transaction", "ItemTitle", collectionTitle)
 
@@ -599,33 +579,33 @@ end
 
 -- BELOW ARE ATLAS ASPACE/AEON FUNCTIONS/METHODS
 function OnError(e)
-    LogDebug("[OnError]");
+    LogDebug("[OnError]") 
     if e == nil then
-        LogDebug("OnError supplied a nil error");
-        return;
+        LogDebug("OnError supplied a nil error") 
+        return 
     end
 
     if not e.GetType then
         -- Not a .NET type
         -- Attempt to log value
         pcall(function ()
-            LogDebug(e);
-        end);
-        return;
+            LogDebug(e) 
+        end) 
+        return 
     else
         if not e.Message then
-            LogDebug(e:ToString());
-            return;
+            LogDebug(e:ToString()) 
+            return 
         end
     end
 
-    local message = TraverseError(e);
+    local message = TraverseError(e) 
 
     if message == nil then
-        message = "Unspecified Error";
+        message = "Unspecified Error" 
     end
 
-    ReportError(message);
+    ReportError(message) 
     return message
 end
 
@@ -634,32 +614,32 @@ end
 function TraverseError(e)
     if not e.GetType then
         -- Not a .NET type
-        return nil;
+        return nil 
     else
         if not e.Message then
             -- Not a .NET exception
-            LogDebug(e:ToString());
-            return nil;
+            LogDebug(e:ToString()) 
+            return nil 
         end
     end
 
-    LogDebug(e.Message);
+    LogDebug(e.Message) 
 
     if e.InnerException then
-        return TraverseError(e.InnerException);
+        return TraverseError(e.InnerException) 
     else
-        return e.Message;
+        return e.Message 
     end
 end
 
 function ReportError(message)
     if (message == nil) then
-        message = "Unspecific error";
+        message = "Unspecific error" 
     end
 
-    LogDebug("An error occurred: " .. message);
-    interfaceMngr:ShowMessage("An error occurred:\r\n" .. message, "ArchivesSpace Addon");
-end;
+    LogDebug("An error occurred: " .. message) 
+    interfaceMngr:ShowMessage("An error occurred:\r\n" .. message, "ArchivesSpace Addon") 
+end 
 
 function GetSessionId()
     local authentication = GetAuthenticationToken()
@@ -667,18 +647,18 @@ function GetSessionId()
 
     if (sessionId == nil or sessionId == JsonParser.NIL or sessionId == '') then
         ReportError("Unable to get valid session ID token.")
-        return nil;
+        return nil 
     end
 
-    return sessionId;
+    return sessionId 
 end
 
 function GetAuthenticationToken()
-	local authenticationToken = JsonParser:ParseJSON(SendApiRequest('users/' .. settings.Username .. '/login', 'POST', { ["password"] = settings.Password }));
+	local authenticationToken = JsonParser:ParseJSON(SendApiRequest('users/' .. settings.Username .. '/login', 'POST', { ["password"] = settings.Password })) 
 
     if (authenticationToken == nil or authenticationToken == JsonParser.NIL) then
         ReportError("Unable to get valid authentication token.")
-        return;
+        return 
     end
 
     return authenticationToken
@@ -686,104 +666,104 @@ end
 
 
 function SendApiRequest(apiPath, method, parameters, authToken)
-    LogDebug('[SendApiRequest] ' .. method);
-    LogDebug('apiPath: ' .. apiPath);
+    LogDebug('[SendApiRequest] ' .. method) 
+    LogDebug('apiPath: ' .. apiPath) 
 
-    local webClient = Types["System.Net.WebClient"]();
+    local webClient = Types["System.Net.WebClient"]() 
 
-    local postParameters = Types["System.Collections.Specialized.NameValueCollection"]();
+    local postParameters = Types["System.Collections.Specialized.NameValueCollection"]() 
     if (parameters ~= nil) then
         for k, v in pairs(parameters) do
-            postParameters:Add(k, v);
+            postParameters:Add(k, v) 
         end
     end
 
-    webClient.Headers:Clear();
+    webClient.Headers:Clear() 
     if (authToken ~= nil and authToken ~= "") then
-        webClient.Headers:Add("X-ArchivesSpace-Session", authToken);
+        webClient.Headers:Add("X-ArchivesSpace-Session", authToken) 
     end
 
-    local success, result;
+    local success, result 
 
     if (method == 'POST') then
-        success, result = pcall(WebClientPost, webClient, apiPath, postParameters);
+        success, result = pcall(WebClientPost, webClient, apiPath, postParameters) 
     else
-        success, result = pcall(WebClientGet, webClient, apiPath);
+        success, result = pcall(WebClientGet, webClient, apiPath) 
     end
 
     if (success) then
-        LogDebug("API call successful");
+        LogDebug("API call successful") 
 
-        local utf8Result = Types["System.Text.Encoding"].UTF8:GetString(result);
+        local utf8Result = Types["System.Text.Encoding"].UTF8:GetString(result) 
 
-        --LogDebug("Response: " .. utf8Result);
-        return utf8Result;
+        --LogDebug("Response: " .. utf8Result) 
+        return utf8Result 
     else
     	LogDebug('Type of the answer:'..type(result))
     	LogDebug('Content of the answer:'.. result:ToString())
     	if ExtractProperty(result, 'code') == 'SESSION_GONE' then
     		return '412'
     	end
-        LogDebug("API call error");
-        s = OnError(result);
+        LogDebug("API call error") 
+        s = OnError(result) 
         -- a message '(412) Precondition Failed' is crafted from OnError if the Session Id was wrong
         -- not the best way to handle this error, but with my knowledge of the Aeon addon API and Lua, it was the most easy solution.
         if string.match(s, '(412)') then
         	return '412'
         end
-        return '';
+        return '' 
     end
 end
 
 function WebClientPost(webClient, apiPath, postParameters)
-    return webClient:UploadValues(PathCombine(settings.APIUrl, apiPath), method, postParameters);
+    return webClient:UploadValues(PathCombine(settings.APIUrl, apiPath), method, postParameters) 
 end
 
 function WebClientGet(webClient, apiPath)
-    return webClient:DownloadData(PathCombine(settings.APIUrl, apiPath));
+    return webClient:DownloadData(PathCombine(settings.APIUrl, apiPath)) 
 end
 
 
 -- Combines two parts of a path, ensuring they're separated by a / character
 function PathCombine(path1, path2)
-    local trailingSlashPattern = '/$';
-    local leadingSlashPattern = '^/';
+    local trailingSlashPattern = '/$' 
+    local leadingSlashPattern = '^/' 
 
     if(path1 and path2) then
-        local result = path1:gsub(trailingSlashPattern, '') .. '/' .. path2:gsub(leadingSlashPattern, '');
-        return result;
+        local result = path1:gsub(trailingSlashPattern, '') .. '/' .. path2:gsub(leadingSlashPattern, '') 
+        return result 
     else
-        return "";
+        return "" 
     end
 end
 
 function ArchivesSpaceGetRequest(sessionId, uri)
-    local response = nil;
+    local response = nil 
 
     if sessionId and uri then
-        response =  JsonParser:ParseJSON(SendApiRequest(uri, 'GET', nil, sessionId));
+        response =  JsonParser:ParseJSON(SendApiRequest(uri, 'GET', nil, sessionId)) 
     else
         LogDebug("Session ID or URI was nil.")
     end
 
     if response == nil then
-        LogDebug("Could not parse response");
+        LogDebug("Could not parse response") 
     end
 
-    return response;
+    return response 
 end
 
 
 function ExtractProperty(object, property)
     if object then
-        return EmptyStringIfNil(object[property]);
+        return EmptyStringIfNil(object[property]) 
     end
 end
 
 function EmptyStringIfNil(value)
     if (value == nil or value == JsonParser.NIL) then
-        return "";
+        return "" 
     else
-        return value;
+        return value 
     end
 end
