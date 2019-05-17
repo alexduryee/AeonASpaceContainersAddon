@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Name>ArchivesSpace Containers</Name>
+  <Author>Cédric Viaccoz</Author>
+  <Version>1.0</Version>
+  <Active>True</Active>
+  <Type>Addon</Type>
+  <Description>Retrieve top containers linked to the call number, title or ead_id of a resource</Description>
+  <Forms>
+    <Form>FormRequest</Form>
+  </Forms>
+  <Permissions />
+  <Settings>
+    <Setting name="TabName" value="ArchivesSpace Containers" type="string">
+      <Description>Defines what text you want to appear on the addon ribbon. Does not affect logging or internal naming.</Description>
+    </Setting>
+    <Setting name="APIUrl" value="" type="string">
+      <Description>The base URL for the custom AS echo webservice</Description>
+    </Setting>
+    <Setting name="APIUsername" value="" type="string">
+      <Description>The username used to access the AS api</Description>
+    </Setting>
+    <Setting name="APIPassword" value="" type="string">
+      <Description>The password used to access the AS api</Description>
+    </Setting>
+    <Setting name="RepoCode" value="" type="string">
+      <Description>The repository code for which the user is allowed to access the AS api</Description>
+    </Setting>
+  </Settings>
+  <Files>
+    <File>Main.lua</File>
+  </Files>
+</Configuration>
