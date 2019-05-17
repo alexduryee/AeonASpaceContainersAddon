@@ -316,11 +316,6 @@ function jsonArrayToDataTable(json_arr)
 	if json_arr == nil then
 		return asItemTable
 	end
-	
-	function setItemTable(tab, fieldName, fieldValue)
-		tab[fieldName] = fieldValue
-		return tab
-	end
 
 	local allRecords = {}
 	for i = 1, #json_arr do
@@ -328,9 +323,9 @@ function jsonArrayToDataTable(json_arr)
 		local row = {}
 		
 		-- I have been checking all the Call number in ASPace, none of them had a comma.
-		setItemTable(row, 'callNumber', split(ExtractProperty(obj, 'title'), ',')[1])
+		row['callNumber'] = split(ExtractProperty(obj, 'title'), ',')[1]
 
-		setItemTable(row, 'collectionTitle', ExtractProperty(obj, 'collection_display_string_u_sstr')[1])
+		row['collectionTitle'] = ExtractProperty(obj, 'collection_display_string_u_sstr')[1]
 
 
 		local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
@@ -361,24 +356,24 @@ function jsonArrayToDataTable(json_arr)
 			indicator = 0
 		end
 
-		setItemTable(row, 'hidden_indicator', indicator)
-		setItemTable(row, 'hidden_container', container)
-		setItemTable(row, 'enumeration', typeEnum)
-		setItemTable(row, 'item_barcode', ExtractProperty(obj, 'barcode_u_sstr')[1])
+		row['hidden_indicator'] = indicator
+		row['hidden_container'] = container
+		row['enumeration'] = typeEnum
+		row['item_barcode'] = ExtractProperty(obj, 'barcode_u_sstr')[1]
 
 		-- apparently some locations can be empty!
-		setItemTable(row, 'location', ExtractProperty(obj, 'location_display_string_u_sstr')[1])
+		row['location'] = ExtractProperty(obj, 'location_display_string_u_sstr')[1]
 
 		-- fetching this information from the 'restricted' field of the json embedded data 
 		local restricted = 'N'
 		if ExtractProperty(jsonString, 'restricted') then
 			restricted = 'Y'
 		end
-		setItemTable(row, 'restrictions', restricted)
+		row['restrictions'] = restricted
 		
 		-- all the ids are 
 		tcId = split(ExtractProperty(obj, 'id'), '/')
-		setItemTable(row, 'item_id', tcId[#tcId])
+		row['item_id'] = tcId[#tcId]
 
 		local seriesStr = ''
 		local seriesArray = ExtractProperty(jsonString, 'series')
@@ -393,10 +388,10 @@ function jsonArrayToDataTable(json_arr)
 			end 
 			seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
 		end
-		setItemTable(row, 'series', seriesStr)
+		row['series'] = seriesStr
 
 		local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
-		setItemTable(row, 'profile', profile)
+		row['profile'] = profile
 		allRecords[i] = row
 	end
 
