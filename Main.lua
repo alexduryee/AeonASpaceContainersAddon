@@ -43,7 +43,7 @@ function Init()
 
 	interfaceMngr = GetInterfaceManager() 
 	form = interfaceMngr:CreateForm(settings.TabName, settings.TabName) 
-
+	settings['APIUrl'] = removeTrailingSlash(settings['APIUrl'])
 	settings['sessionID'] = GetSessionId()
 	if settings['sessionID'] == nil then
 		interfaceMngr:ShowMessage('The session ID for interaction with the API could not be retrieved', 'Network error')
@@ -716,6 +716,14 @@ end
 
 function WebClientGet(webClient, apiPath)
     return webClient:DownloadData(PathCombine(settings.APIUrl, apiPath)) 
+end
+
+
+-- source: https://github.com/gordonbrander/lettersmith/blob/master/lettersmith/path_utils.lua
+function removeTrailingSlash(s)
+  -- Remove trailing slash from string. Will not remove slash if it is the
+  -- only character in the string.
+  return s:gsub('(.)%/$', '%1')
 end
 
 
