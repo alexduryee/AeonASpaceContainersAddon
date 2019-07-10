@@ -39,7 +39,6 @@ function performSearch(field, fieldName)
 			res = getTopContainersByCallNumber(field.Value)
 		end
 
-		
-		GetBoxes(jsonArrayToDataTable(res), fieldName)
+		GetBoxes(convertResultsIntoDataTable(res), fieldName)
 	end
 end

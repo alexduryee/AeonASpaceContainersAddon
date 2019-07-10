@@ -42,6 +42,10 @@ JsonParser.Log = luanet.import_type("log4net.LogManager").GetLogger(JsonParser.r
 
 
 function JsonParser:ParseJSON (jsonString)
+    
+    if not jsonString then
+        return JsonParser.NIL
+    end
     local stringReader = JsonParser.Types["StringReader"](jsonString);
     local reader = JsonParser.Types["JsonTextReader"](stringReader);
 

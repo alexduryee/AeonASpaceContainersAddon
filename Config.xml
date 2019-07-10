@@ -23,9 +23,6 @@
     <Setting name="APIPassword" value="" type="string">
       <Description>The password used to access the AS api</Description>
     </Setting>
-    <Setting name="RepoCode" value="" type="string">
-      <Description>The repository code for which the user is allowed to access the AS api</Description>
-    </Setting>
   </Settings>
   <Files>
     <File>Main.lua</File>

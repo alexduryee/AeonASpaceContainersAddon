@@ -31,13 +31,16 @@ Types["System.Text.Encoding"] = luanet.import_type("System.Text.Encoding")
 Buttons = {} 
 Ribbons = {} 
 
-require("Helpers") 
-require("EventHandlers") 
-require("Grids") 
+require("Helpers")
+require("EventHandlers")
+require("Grids")
+require("API")
 require "Atlas-Addons-Lua-ParseJson.JsonParser"
 
 local form = nil 
-local interfaceMngr = nil 
+interfaceMngr = nil 
+
+
 
 function Init()
 
@@ -46,17 +49,18 @@ function Init()
 	settings['APIUrl'] = removeTrailingSlash(settings['APIUrl'])
 	settings['sessionID'] = GetSessionId()
 	if settings['sessionID'] == nil then
-		interfaceMngr:ShowMessage('The session ID for interaction with the API could not be retrieved', 'Network error')
+		interfaceMngr:ShowMessage('The session ID for interaction with the API could not be retrieved. Please check the username and password in the container lookup addon settings.', 'Network error')
 		return
 	end
-	
-	settings["RepoID"] = getRepoId(settings["RepoCode"])
 
-	if settings["RepoID"] == nil or settings["RepoID"] == '' then
-		interfaceMngr:ShowMessage('The repository ID could not be retrieved for the current repository code: '.. settings["RepoCode"], 'Error')
+	settings["repoTable"] = getListOfRepo()
+	settings["numberOfRepos"] = tableLength(settings["repoTable"])
+	if settings["numberOfRepos"] == 0 then
+		interfaceMngr:ShowMessage('You do not currently have access to the ArchivesSpace API. Please check that the network you are on is allowed to access the ArchivesSpace API.', 'API access error')
 		return
 	end
-	
+
+
 	Ribbons["CN"] = form:CreateRibbonPage("Container Search") 
 
 	if (AddonInfo.CurrentForm == "FormRequest") then
@@ -113,10 +117,18 @@ function Init()
 	else
 		result = getTopContainersByCallNumber(callNumber)
 	end
-	
-	local tab = jsonArrayToDataTable(result)
+	local tab = convertResultsIntoDataTable(result)
 
 	GetBoxes(tab, searchTypeStr)
+end
+
+function convertResultsIntoDataTable(repoJsonTable)
+	local resultDataTable = Types["System.Data.DataTable"]()
+	for repoCode, jsonRes in pairs(repoJsonTable) do
+		local currDataTable = jsonArrayToDataTable(jsonRes, repoCode)
+		resultDataTable:Merge(currDataTable)
+	end
+	return resultDataTable
 end
 
 function containersSearch()
@@ -153,14 +165,14 @@ function containersSearch()
 end
 
 
-function getFullResourceById(resourceId)
-	local searchResourceReq = 'repositories/' .. settings['RepoID'] .. '/resources/' .. resourceId
+function getFullResourceById(repoID, resourceId)
+	local searchResourceReq = 'repositories/' .. repoID .. '/resources/' .. resourceId
 	return getElementBySearchQuery(searchResourceReq)
 end
 
 
-function getResourceIdByCallNumber(callNumb)
-	results = getResourceByCallNumber(callNumb)
+function getResourceIdByCallNumber(callNumb, repoId)
+	results = getResourceByCallNumber(callNumb, repoId)
 	resource_id = ExtractProperty(results, 'id')
 	pathSplit = split(resource_id, '/')
 	actual_id = pathSplit[#pathSplit]
@@ -168,13 +180,13 @@ function getResourceIdByCallNumber(callNumb)
 end
 
 
-function getResourceByCallNumber(callNumb)
-	local searchResourceReq = 'repositories/' .. settings['RepoID'] .. '/search?page=1&q=four_part_id:("' .. callNumb .. '")&type[]=resource'
+function getResourceByCallNumber(callNumb, repoId)
+	local searchResourceReq = 'repositories/' .. repoId .. '/search?page=1&q=four_part_id:("' .. callNumb .. '")&type[]=resource'
 	local res = getElementBySearchQuery(searchResourceReq)
 
 	total_hits = ExtractProperty(res, "total_hits")
 	if total_hits == 0 then
-		interfaceMngr:ShowMessage('The resource corresponding to the call number"' .. callNumb .. '" could not be found on the database.','Error')
+		interfaceMngr:ShowMessage('The resource corresponding to the call number "' .. callNumb .. '" could not be found on the database.','Error')
 		return nil-- no point in trying to do anything else in such case
 	elseif total_hits > 1 then
 		LogDebug('Call number search returned ' .. total_hits .. ' results when only 1 should have been returned. The first result will be used')
@@ -189,6 +201,9 @@ function getTopContainersByCallNumber(callNumb)
 	return getTopContainersBySearchQuery('q=collection_identifier_u_stext:("'..callNumb..'")')
 end
 
+-- function getTopContainersByCallNumberUnfuzzy(callNumb)
+--	return getTopContainersBySearchQuery('q=collection_identifier_stored_u_sstr:("'..callNumb..'")')
+-- end
 
 function getTopContainersByTitle(title)
 	return getTopContainersBySearchQuery('q=collection_display_string_u_sstr:("'..title..'")')
@@ -196,35 +211,40 @@ end
 
 function getTopContainersByEADID(eadid)
 	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
-	local callNumber = getResourceCallNumberByEADID(eadid:lower())
+	local callNumber = getResourceCallNumberByEADID(eadid:lower(), repoId)
 	if callNumber == nil then
 		return nil
 	end
-	return getTopContainersByCallNumber(callNumber)
+	return getTopContainersByCallNumberUnfuzzy(callNumber)
 end
 
 function getTopContainersBySearchQuery(searchQuery)
-	local searchResourceReq = 'repositories/' .. settings['RepoID'] .. '/top_containers/search?' .. searchQuery
-	local res = getElementBySearchQuery(searchResourceReq)
+	local resultTable = {}
+	for code, id in pairs(settings['repoTable']) do
+		resultTable[code] = nil
+		local searchResourceReq = 'repositories/' .. id .. '/top_containers/search?' .. searchQuery
+		local res = getElementBySearchQuery(searchResourceReq)
 
-	-- to reformat
-	local response = ExtractProperty(res, "response")
-	if response == '' then
-		return nil
+		-- to reformat
+		local response = ExtractProperty(res, "response")
+		if response ~= '' then
+			local numFound = ExtractProperty(response, "numFound")
+			if numFound ~= '' and numFound > 1 then
+				local docs = ExtractProperty(response, "docs")
+				resultTable[code] = docs
+			end
+		end
 	end
-
-	local numFound = ExtractProperty(response, "numFound")
-	if numFound == '' or numFound < 1 then
-		--interfaceMngr:ShowMessage('No top containers were found for this Call Number', 'error')
-		return nil
-	end
-	local docs = ExtractProperty(response, "docs")
-	
-	return docs
+ 	return resultTable
 end
 
 function getResourceCallNumberByEADID(eadid)
-	local searchResourceReq = 'repositories/' .. settings['RepoID'] .. '/search?page=1&q=ead_id:("' .. eadid .. '")&type[]=resource'
+	local repoCode = string.match(eadid, '[a-z][a-z][a-z]')
+	local repoId = settings["repoTable"][string.upper(repoCode)]
+	if not repoId then
+		return nil
+	end
+	local searchResourceReq = 'repositories/' .. repoId .. '/search?page=1&q=ead_id:("' .. eadid .. '")&type[]=resource'
 	local res = getElementBySearchQuery(searchResourceReq)
 
 	-- to reformat
@@ -244,23 +264,26 @@ end
 function getElementBySearchQuery(searchQuery)
 	local res = ArchivesSpaceGetRequest(settings['sessionID'], searchQuery)
 	--LogDebug(res)
+	local errorCode = res['httpErrorCode']
+	if errorCode == 412 then
+		-- the http error code of 412 means the session id has expired
+		settings['sessionID'] = GetSessionId()
+		return getElementBySearchQuery(searchQuery)
+	end
+
 	if res == nil then
 		interfaceMngr:ShowMessage('could not retrieve search query result', 'error')
 		return nil -- no point in trying to do anything else in such case
-	elseif res == '412' then
-		-- if res was the 412 string, this means the session id expired. A new one will be fetched.
-		settings['sessionID'] = GetSessionId()
-		return getElementBySearchQuery(searchQuery)
 	end
 	return res
 end
 
-function checkRepoCode()
-	repoCode = GetFieldValue("Transaction", "Location") 
-	if repoCode == nil or repoCode == '' then
+function checkRepoCode(repoCode)
+	local transRepoCode = GetFieldValue("Transaction", "Location") 
+	if transRepoCode == nil or transRepoCode == '' then
 		return -- in a hypothetical request with no repo code. 
 	end
-	if repoCode ~= settings['RepoCode'] then
+	if transRepoCode ~= repoCode then
 		interfaceMngr:ShowMessage('You are not authorized to make top containers search on this repository', 'Warning')
 		return 
 	end
@@ -286,6 +309,35 @@ function getRepoId(repoCode)
 	return nil
 end
 
+
+-- cannot use '#' if the table is not numerically indexed in sequence. 
+function tableLength(T)
+  local count = 0
+  for _ in pairs(T) do count = count + 1 end
+  return count
+end
+
+
+function getListOfRepo()
+	local resTable = {}
+	local searchResourceReq = 'repositories'
+	local res = getElementBySearchQuery(searchResourceReq)
+	for i=1, #res do
+		local currRepo = res[i]
+		local repoCode = ExtractProperty(currRepo, 'repo_code')
+		local repoUri = split(ExtractProperty(currRepo, 'uri'), '/')
+		local repoId = repoUri[#repoUri] 
+		-- In HL at least, no resources have 0 as an ID
+		local resource = getFullResourceById(repoId, 0)
+		httpErrorCode = resource['httpErrorCode']
+		-- a 404 means the user could access the repo but the resource was not found. A 403 would be returned if the resource 
+		if httpErrorCode == 404 then
+			resTable[repoCode] = repoId
+		end
+	end
+	return resTable
+end
+
 function setItemNode(itemRow, aeonField, data)
     local success, err = pcall(function()
         itemRow:set_Item(aeonField, data) 
@@ -309,7 +361,7 @@ function setItemNode(itemRow, aeonField, data)
     return itemRow 
 end
 
-function jsonArrayToDataTable(json_arr)
+function jsonArrayToDataTable(json_arr, repoCode)
 
 	local asItemTable = Types["System.Data.DataTable"]()
 
@@ -392,6 +444,7 @@ function jsonArrayToDataTable(json_arr)
 
 		local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
 		row['profile'] = profile
+		row['repoCode'] = repoCode
 		allRecords[i] = row
 	end
 
@@ -427,6 +480,7 @@ function jsonArrayToDataTable(json_arr)
 	asItemTable.Columns:Add("item_id")
 	asItemTable.Columns:Add("series")
 	asItemTable.Columns:Add("profile")
+	asItemTable.Columns:Add("repo_code")
 
 	for _, value in ipairs(allRecords) do
 		local row = asItemTable:NewRow()
@@ -439,6 +493,7 @@ function jsonArrayToDataTable(json_arr)
 		setItemNode(row,'item_id', value['item_id'])
 		setItemNode(row,'series', value['series'])
 		setItemNode(row,'profile', value['profile'])
+		setItemNode(row,'repo_code', value['repoCode'])
 		asItemTable.Rows:Add(row)
 	end
 
@@ -449,7 +504,6 @@ function GetBoxes(tab, itemQuery)
 		-- itemQuery specify which term was used for the search (call number or title), usefule for outputting the was "not found" message. 
 		LogDebug("Retrieving boxes.") 
 		clearTable(asItemsGrid)  --Clear item grid to avoid mixed series/items
-		
 		numberSearchResult.Value = tab.Rows.Count -- for the user to see the number of search results
 		local itemGridControl = asItemsGrid.GridControl 
 		if (tab.Rows.Count ~= 0) then
@@ -489,6 +543,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	local location = itemRow:get_Item("location")
 	local itemInfo1 = itemRow:get_Item("restrictions")
 	local series = itemRow:get_Item("series")
+	local repoCode = itemRow:get_Item("repo_code")
 
 	-- Update the item object with the new values.
 	function setFieldValueIfNotNil(formName, fieldName, value)
@@ -509,7 +564,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 		setFieldValueIfNotNil("Transaction", "ItemCitation", series)
 		setFieldValueIfNotNil("Transaction", "ItemTitle", collectionTitle)
 
-		local res = getResourceByCallNumber(callNumber)
+		local res = getResourceByCallNumber(callNumber, settings["repoTable"][repoCode])
 		-- a use case for res to be nil: if the resource is actually an accession.
 		if res ~= nil then
 			local creators = ExtractProperty(res, 'creators') 
@@ -525,7 +580,8 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 			local resourceId = resourceElems[#resourceElems]
 			setFieldValueIfNotNil("Transaction", "Location", repoCode)
 
-			local resourceObj = getFullResourceById(resourceId)
+			local repoId = settings["repoTable"][repoCode]
+			local resourceObj = getFullResourceById(repoId, resourceId)
 			local notes = ExtractProperty(resourceObj, 'notes')
 			
 			local a_id = extractNoteContent(notes, 'label', 'Alma ID', 'subnotes')
@@ -573,190 +629,6 @@ function extractNoteContent(notesArray, jsonField, fieldValue, toExtract)
 end
 
 -- BELOW ARE ATLAS ASPACE/AEON FUNCTIONS/METHODS
-function OnError(e)
-    LogDebug("[OnError]") 
-    if e == nil then
-        LogDebug("OnError supplied a nil error") 
-        return 
-    end
-
-    if not e.GetType then
-        -- Not a .NET type
-        -- Attempt to log value
-        pcall(function ()
-            LogDebug(e) 
-        end) 
-        return 
-    else
-        if not e.Message then
-            LogDebug(e:ToString()) 
-            return 
-        end
-    end
-
-    local message = TraverseError(e) 
-
-    if message == nil then
-        message = "Unspecified Error" 
-    end
-
-    ReportError(message) 
-    return message
-end
-
-
--- Recursively logs exception messages and returns the innermost message to caller
-function TraverseError(e)
-    if not e.GetType then
-        -- Not a .NET type
-        return nil 
-    else
-        if not e.Message then
-            -- Not a .NET exception
-            LogDebug(e:ToString()) 
-            return nil 
-        end
-    end
-
-    LogDebug(e.Message) 
-
-    if e.InnerException then
-        return TraverseError(e.InnerException) 
-    else
-        return e.Message 
-    end
-end
-
-function ReportError(message)
-    if (message == nil) then
-        message = "Unspecific error" 
-    end
-
-    LogDebug("An error occurred: " .. message) 
-    interfaceMngr:ShowMessage("An error occurred:\r\n" .. message, "ArchivesSpace Addon") 
-end 
-
-function GetSessionId()
-    local authentication = GetAuthenticationToken()
-    local sessionId = ExtractProperty(authentication, "session")
-
-    if (sessionId == nil or sessionId == JsonParser.NIL or sessionId == '') then
-        ReportError("Unable to get valid session ID token.")
-        return nil 
-    end
-
-    return sessionId 
-end
-
-function GetAuthenticationToken()
-	local authenticationToken = JsonParser:ParseJSON(SendApiRequest('users/' .. settings.Username .. '/login', 'POST', { ["password"] = settings.Password })) 
-
-    if (authenticationToken == nil or authenticationToken == JsonParser.NIL) then
-        ReportError("Unable to get valid authentication token.")
-        return 
-    end
-
-    return authenticationToken
-end
-
-
-function SendApiRequest(apiPath, method, parameters, authToken)
-    LogDebug('[SendApiRequest] ' .. method) 
-    LogDebug('apiPath: ' .. apiPath) 
-
-    local webClient = Types["System.Net.WebClient"]() 
-
-    local postParameters = Types["System.Collections.Specialized.NameValueCollection"]() 
-    if (parameters ~= nil) then
-        for k, v in pairs(parameters) do
-            postParameters:Add(k, v) 
-        end
-    end
-
-    webClient.Headers:Clear() 
-    if (authToken ~= nil and authToken ~= "") then
-        webClient.Headers:Add("X-ArchivesSpace-Session", authToken) 
-    end
-
-    local success, result 
-
-    if (method == 'POST') then
-        success, result = pcall(WebClientPost, webClient, apiPath, postParameters) 
-    else
-        success, result = pcall(WebClientGet, webClient, apiPath) 
-    end
-
-    if (success) then
-        LogDebug("API call successful") 
-
-        local utf8Result = Types["System.Text.Encoding"].UTF8:GetString(result) 
-
-        --LogDebug("Response: " .. utf8Result) 
-        return utf8Result 
-    else
-    	LogDebug('Type of the answer:'..type(result))
-    	LogDebug('Content of the answer:'.. result:ToString())
-    	if ExtractProperty(result, 'code') == 'SESSION_GONE' then
-    		return '412'
-    	end
-        LogDebug("API call error") 
-        s = OnError(result) 
-        -- a message '(412) Precondition Failed' is crafted from OnError if the Session Id was wrong
-        -- not the best way to handle this error, but with my knowledge of the Aeon addon API and Lua, it was the most easy solution.
-        if string.match(s, '(412)') then
-        	return '412'
-        end
-        return '' 
-    end
-end
-
-function WebClientPost(webClient, apiPath, postParameters)
-    return webClient:UploadValues(PathCombine(settings.APIUrl, apiPath), method, postParameters) 
-end
-
-function WebClientGet(webClient, apiPath)
-    return webClient:DownloadData(PathCombine(settings.APIUrl, apiPath)) 
-end
-
-
--- source: https://github.com/gordonbrander/lettersmith/blob/master/lettersmith/path_utils.lua
-function removeTrailingSlash(s)
-  -- Remove trailing slash from string. Will not remove slash if it is the
-  -- only character in the string.
-  return s:gsub('(.)%/$', '%1')
-end
-
-
--- Combines two parts of a path, ensuring they're separated by a / character
-function PathCombine(path1, path2)
-    local trailingSlashPattern = '/$' 
-    local leadingSlashPattern = '^/' 
-
-    if(path1 and path2) then
-        local result = path1:gsub(trailingSlashPattern, '') .. '/' .. path2:gsub(leadingSlashPattern, '') 
-        return result 
-    else
-        return "" 
-    end
-end
-
-function ArchivesSpaceGetRequest(sessionId, uri)
-    local response = nil 
-
-    if sessionId and uri then
-        response =  JsonParser:ParseJSON(SendApiRequest(uri, 'GET', nil, sessionId)) 
-    else
-        LogDebug("Session ID or URI was nil.")
-    end
-
-    if response == nil then
-        LogDebug("Could not parse response") 
-    end
-
-    return response 
-end
-
-
 function ExtractProperty(object, property)
     if object then
         return EmptyStringIfNil(object[property]) 

@@ -145,4 +145,14 @@ function fillItemTable(gridControl)
 	gridColumn.VisibleIndex = 8 
 	gridColumn.OptionsColumn.ReadOnly = true 
 
+	local gridColumn 
+	gridColumn = gridView.Columns:Add() 
+	gridColumn.Caption = "Repo" 
+	gridColumn.FieldName = "repo_code" 
+	gridColumn.Name = "gcRepo_code" 
+	gridColumn.Width = 40 
+	gridColumn.Visible = true 
+	gridColumn.VisibleIndex = 9 
+	gridColumn.OptionsColumn.ReadOnly = true 
+
 end
