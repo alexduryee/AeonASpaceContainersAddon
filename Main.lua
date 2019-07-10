@@ -207,15 +207,42 @@ function getTopContainersByTitle(title)
 	return getTopContainersBySearchQuery('q=collection_display_string_u_sstr:("'..title..'")')
 end
 
+
+
 function getTopContainersByEADID(eadid)
 	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
-	local callNumber = getResourceCallNumberByEADID(eadid:lower(), repoId)
-	if callNumber == nil then
+	local repoCode = string.match(eadid, '[a-z][a-z][a-z]')
+	local repoId = settings["repoTable"][string.upper(repoCode)]
+	if not repoId then
 		return nil
 	end
-	return getTopContainersByCallNumber(callNumber)
+	local resourceId = getResourceIdByEADID(eadid:lower(), repoId)
+	if resourceId == nil then
+		return nil
+	end
+	return getTopContainersByResourceId(resourceId, repoCode)
 end
 
+function getTopContainersByResourceId(resourceId, repoCode)
+	local resultTable = {}
+	local repoId = split(resourceId, '/')[2]
+	local searchTopContReq = 'repositories/' .. repoId .. '/top_containers/search?q=collection_uri_u_sstr:("'..resourceId..'")'
+	local res = getElementBySearchQuery(searchTopContReq)
+
+	-- to reformat
+	local response = ExtractProperty(res, "response")
+	if response ~= '' then
+		local numFound = ExtractProperty(response, "numFound")
+		if numFound ~= '' and numFound > 0 then
+			local docs = ExtractProperty(response, "docs")
+			interfaceMngr:ShowMessage('Extracted the docs', 'Yes')
+			resultTable[repoCode] = docs
+		end
+	end
+	return resultTable
+end
+
+-- todo: refactoring
 function getTopContainersBySearchQuery(searchQuery)
 	local resultTable = {}
 	for code, id in pairs(settings['repoTable']) do
@@ -227,7 +254,7 @@ function getTopContainersBySearchQuery(searchQuery)
 		local response = ExtractProperty(res, "response")
 		if response ~= '' then
 			local numFound = ExtractProperty(response, "numFound")
-			if numFound ~= '' and numFound > 1 then
+			if numFound ~= '' and numFound > 0 then
 				local docs = ExtractProperty(response, "docs")
 				resultTable[code] = docs
 			end
@@ -236,12 +263,7 @@ function getTopContainersBySearchQuery(searchQuery)
  	return resultTable
 end
 
-function getResourceCallNumberByEADID(eadid)
-	local repoCode = string.match(eadid, '[a-z][a-z][a-z]')
-	local repoId = settings["repoTable"][string.upper(repoCode)]
-	if not repoId then
-		return nil
-	end
+function getResourceIdByEADID(eadid, repoId)
 	local searchResourceReq = 'repositories/' .. repoId .. '/search?page=1&q=ead_id:("' .. eadid .. '")&type[]=resource'
 	local res = getElementBySearchQuery(searchResourceReq)
 
@@ -256,7 +278,7 @@ function getResourceCallNumberByEADID(eadid)
 		return nil
 	end
 	
-	return ExtractProperty(results[1], "identifier")
+	return ExtractProperty(results[1], "id")
 end
 
 function getElementBySearchQuery(searchQuery)
@@ -333,7 +355,6 @@ function getListOfRepo()
 			resTable[repoCode] = repoId
 		end
 	end
-	interfaceMngr:ShowMessage('Time spent (in s): '..os.difftime(end_time, start_time), 'Info')
 	return resTable
 end
 
