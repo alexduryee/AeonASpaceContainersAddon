@@ -104,7 +104,7 @@ function Init()
 	form:LoadLayout("layout.xml") 
 
 	form:Show() 
-	local result = nil 
+	local result = {} 
 	local searchTypeStr = 'call number'
 
 	if callNumber == nil or callNumber == ''  then
@@ -117,6 +117,7 @@ function Init()
 	else
 		result = getTopContainersByCallNumber(callNumber)
 	end
+
 	local tab = convertResultsIntoDataTable(result)
 
 	GetBoxes(tab, searchTypeStr)
@@ -201,9 +202,6 @@ function getTopContainersByCallNumber(callNumb)
 	return getTopContainersBySearchQuery('q=collection_identifier_u_stext:("'..callNumb..'")')
 end
 
--- function getTopContainersByCallNumberUnfuzzy(callNumb)
---	return getTopContainersBySearchQuery('q=collection_identifier_stored_u_sstr:("'..callNumb..'")')
--- end
 
 function getTopContainersByTitle(title)
 	return getTopContainersBySearchQuery('q=collection_display_string_u_sstr:("'..title..'")')
@@ -215,7 +213,7 @@ function getTopContainersByEADID(eadid)
 	if callNumber == nil then
 		return nil
 	end
-	return getTopContainersByCallNumberUnfuzzy(callNumber)
+	return getTopContainersByCallNumber(callNumber)
 end
 
 function getTopContainersBySearchQuery(searchQuery)
@@ -335,6 +333,7 @@ function getListOfRepo()
 			resTable[repoCode] = repoId
 		end
 	end
+	interfaceMngr:ShowMessage('Time spent (in s): '..os.difftime(end_time, start_time), 'Info')
 	return resTable
 end
 
