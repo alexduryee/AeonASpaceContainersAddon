@@ -406,9 +406,12 @@ function jsonArrayToDataTable(json_arr, repoCode)
 	for i = 1, #json_arr do
 		local obj = json_arr[i]
 		local callNumbers = ExtractProperty(obj, 'collection_identifier_stored_u_sstr')
-		for _, cn in pairs(callNumbers) do
+		local titles = ExtractProperty(obj, 'collection_display_string_u_sstr')
+		for i=1,#callNumbers do
+			local currCN = callNumbers[i]
+			local currTitle = titles[i]
 			-- in the barcode case, one search result will be linked to one or more resources.
-			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, cn, repoCode)
+			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, currCN, currTitle, repoCode)
 		end
 	end
 
@@ -465,11 +468,11 @@ function jsonArrayToDataTable(json_arr, repoCode)
 end
 
 
-function extractTopContainersInformation(obj, callNumber, repoCode)
+function extractTopContainersInformation(obj, callNumber, title, repoCode)
 	local row = {}
 	row['callNumber'] = callNumber
 
-	row['collectionTitle'] = ExtractProperty(obj, 'collection_display_string_u_sstr')[1]
+	row['collectionTitle'] = title
 
 
 	local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
@@ -515,7 +518,7 @@ function extractTopContainersInformation(obj, callNumber, repoCode)
 	end
 	row['restrictions'] = restricted
 
-	-- all the ids are 
+	-- all the ids are prepended with the database path. 
 	tcId = split(ExtractProperty(obj, 'id'), '/')
 	row['item_id'] = tcId[#tcId]
 
@@ -584,6 +587,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	local itemInfo1 = itemRow:get_Item("restrictions")
 	local series = itemRow:get_Item("series")
 	local repoCode = itemRow:get_Item("repo_code")
+	local recordId = itemRow:get_Item("item_id")
 
 	-- Update the item object with the new values.
 	function setFieldValueIfNotNil(formName, fieldName, value)
@@ -600,13 +604,19 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	
 
 	if withCitation then
-		setFieldValueIfNotNil("Transaction", "CallNumber", callNumber) 
-		setFieldValueIfNotNil("Transaction", "ItemCitation", series)
+		setFieldValueIfNotNil("Transaction", "CallNumber", callNumber)
 		setFieldValueIfNotNil("Transaction", "ItemTitle", collectionTitle)
+		setFieldValueIfNotNil("Transaction", "Location", repoCode)
 
-		local res = getResourceByCallNumber(callNumber, settings["repoTable"][repoCode])
-		-- a use case for res to be nil: if the resource is actually an accession.
-		if res ~= nil then
+		local documentPath = retrieveDocumentPathByTCID(settings["repoTable"][repoCode], recordId)
+		-- format of a document path: /repositories/[repoID]/[resources|accessions]/[documentID]
+		
+		local documentType = split(documentPath, '/')[3]
+		if documentType == 'resources' then
+
+			setFieldValueIfNotNil("Transaction", "ItemCitation", series)
+			
+			local res = getResourceByCallNumber(callNumber, settings["repoTable"][repoCode])
 			local creators = ExtractProperty(res, 'creators') 
 			local creator = nil
 			if creators ~= nil then
@@ -616,10 +626,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 			
 			local resourceURL = ExtractProperty(res, 'id')
 			local resourceElems = split(resourceURL, '/')
-			local repoCode = getRepoCode(resourceElems[2])
 			local resourceId = resourceElems[#resourceElems]
-			setFieldValueIfNotNil("Transaction", "Location", repoCode)
-
 			local repoId = settings["repoTable"][repoCode]
 			local resourceObj = getFullResourceById(repoId, resourceId)
 			local notes = ExtractProperty(resourceObj, 'notes')
@@ -657,6 +664,16 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	ExecuteCommand("SwitchTab", {"Detail"})
 end
 
+
+function retrieveDocumentPathByTCID(repoId, recordId)
+	local searchResourceReq = 'repositories/' .. repoId .. '/top_containers/'..recordId
+	local res = getElementBySearchQuery(searchResourceReq)
+	local collInfo = ExtractProperty(res, "collection")
+	if collInfo ~= nil then
+		local ref = ExtractProperty(collInfo[1], 'ref')
+		return ref
+	end
+end
 
 function extractNoteContent(notesArray, jsonField, fieldValue, toExtract)
 	for i = 1, #notesArray do
