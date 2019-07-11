@@ -211,8 +211,8 @@ end
 
 function getTopContainersByEADID(eadid)
 	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
-	local repoCode = string.match(eadid, '[a-z][a-z][a-z]')
-	local repoId = settings["repoTable"][string.upper(repoCode)]
+	local repoCode = string.match(eadid, '[a-zA-Z][a-zA-Z][a-zA-Z]'):upper()
+	local repoId = settings["repoTable"][repoCode]
 	if not repoId then
 		return nil
 	end
@@ -228,39 +228,31 @@ function getTopContainersByResourceId(resourceId, repoCode)
 	local repoId = split(resourceId, '/')[2]
 	local searchTopContReq = 'repositories/' .. repoId .. '/top_containers/search?q=collection_uri_u_sstr:("'..resourceId..'")'
 	local res = getElementBySearchQuery(searchTopContReq)
-
-	-- to reformat
-	local response = ExtractProperty(res, "response")
-	if response ~= '' then
-		local numFound = ExtractProperty(response, "numFound")
-		if numFound ~= '' and numFound > 0 then
-			local docs = ExtractProperty(response, "docs")
-			interfaceMngr:ShowMessage('Extracted the docs', 'Yes')
-			resultTable[repoCode] = docs
-		end
-	end
+	getResultAndPopulateTableOfJson(searchTopContReq, resultTable, repoCode)
 	return resultTable
 end
 
--- todo: refactoring
+
 function getTopContainersBySearchQuery(searchQuery)
 	local resultTable = {}
 	for code, id in pairs(settings['repoTable']) do
 		resultTable[code] = nil
 		local searchResourceReq = 'repositories/' .. id .. '/top_containers/search?' .. searchQuery
-		local res = getElementBySearchQuery(searchResourceReq)
-
-		-- to reformat
-		local response = ExtractProperty(res, "response")
-		if response ~= '' then
-			local numFound = ExtractProperty(response, "numFound")
-			if numFound ~= '' and numFound > 0 then
-				local docs = ExtractProperty(response, "docs")
-				resultTable[code] = docs
-			end
-		end
+		getResultAndPopulateTableOfJson(searchResourceReq, resultTable, code)
 	end
  	return resultTable
+end
+
+function getResultAndPopulateTableOfJson(searchResourceQuery, jsonTable, repoCode)
+	local res = getElementBySearchQuery(searchResourceQuery)
+	local response = ExtractProperty(res, "response")
+	if response ~= '' then
+		local numFound = ExtractProperty(response, "numFound")
+		if numFound ~= '' and numFound > 0 then
+			local docs = ExtractProperty(response, "docs")
+			jsonTable[repoCode] = docs
+		end
+	end
 end
 
 function getResourceIdByEADID(eadid, repoId)
@@ -648,7 +640,6 @@ function extractNoteContent(notesArray, jsonField, fieldValue, toExtract)
 	return nil
 end
 
--- BELOW ARE ATLAS ASPACE/AEON FUNCTIONS/METHODS
 function ExtractProperty(object, property)
     if object then
         return EmptyStringIfNil(object[property]) 
