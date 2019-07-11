@@ -99,6 +99,8 @@ function Init()
 	eadidTerm = form:CreateTextEdit('eadid', "EADID") 
 	eadidTerm.Editor.KeyDown:Add(EADIDSubmitCheck)
 
+	barcodeTerm = form:CreateTextEdit("barcode", "Barcode")
+	barcodeTerm.Editor.KeyDown:Add(BarcodeSubmitCheck)
 
 	-- This specifies the layout of the different component of the addon (the grid, the ribbons etc..) the default placement being rather poor.
 	form:LoadLayout("layout.xml") 
@@ -141,12 +143,14 @@ function containersSearch()
 	titleIsFilled = isFieldFilled(collectionTitle)
 	eadIsFilled = isFieldFilled(eadidTerm)
 	callIsFilled = isFieldFilled(searchTerm)
+	barcodeIsFilled = isFieldFilled(barcodeTerm)
+
 
 	function countIfTrue(cond) 
 		if cond then return 1 else return 0 end
 	end
 
-	local nField = countIfTrue(titleIsFilled) + countIfTrue(eadIsFilled) + countIfTrue(callIsFilled)
+	local nField = countIfTrue(titleIsFilled) + countIfTrue(eadIsFilled) + countIfTrue(callIsFilled) + countIfTrue(barcodeIsFilled)
 	if nField ~= 1 then
 		interfaceMngr:ShowMessage('Only one search field should be filled for containers search', 'Cannot retrieve search results')
 		return
@@ -160,8 +164,10 @@ function containersSearch()
 		performSearch(collectionTitle, 'title')
 	elseif eadIsFilled then
 		performSearch(eadidTerm, 'ead_id')
-	else
+	elseif callIsFilled then
 		performSearch(searchTerm, 'call number')
+	else
+		performSearch(barcodeTerm, 'barcode')
 	end
 end
 
@@ -207,18 +213,35 @@ function getTopContainersByTitle(title)
 	return getTopContainersBySearchQuery('q=collection_display_string_u_sstr:("'..title..'")')
 end
 
+function getTopContainersByBarcode(barcode)
+	return getTopContainersBySearchQuery('q=barcode_u_sstr:("'..barcode..'")')
+end
+
 
 
 function getTopContainersByEADID(eadid)
 	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
-	local repoCode = string.match(eadid, '[a-zA-Z][a-zA-Z][a-zA-Z]'):upper()
+	local repoCode = string.match(eadid, '[a-zA-Z][a-zA-Z][a-zA-Z]')
+	interfaceMngr:ShowMessage(repoCode, 'eadid filtered')
+	if repoCode == nil or repoCode == '' then
+		-- need to return an empty table as the return argument will get passed to convertResultsIntoDataTable
+		-- which expect to have a table as argument.
+		return {}
+	else
+		-- need to be sure the three first letters of the eadid corresponds to the 
+		-- repository code stored in the setting's repoTable (where they are all uppercased) 
+		repoCode = repoCode:upper()
+	end
+
 	local repoId = settings["repoTable"][repoCode]
-	if not repoId then
-		return nil
+	interfaceMngr:ShowMessage(repoId, 'repoId')
+	
+	if repoId == nil or repoId == '' then
+		return {}
 	end
 	local resourceId = getResourceIdByEADID(eadid:lower(), repoId)
 	if resourceId == nil then
-		return nil
+		return {}
 	end
 	return getTopContainersByResourceId(resourceId, repoCode)
 end

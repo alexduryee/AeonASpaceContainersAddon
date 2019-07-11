@@ -17,7 +17,7 @@
     <property name="UseDefaultLookAndFeel">true</property>
     <property name="UseWindowsXPTheme">false</property>
   </property>
-  <property name="Items" iskey="true" value="10">
+  <property name="Items" iskey="true" value="11">
     <property name="Item1" isnull="true" iskey="true">
       <property name="TypeName">LayoutGroup</property>
       <property name="TabbedGroupParentName" />
@@ -69,7 +69,7 @@
         <property name="RowDefinitions" iskey="true" value="0" />
         <property name="ColumnDefinitions" iskey="true" value="0" />
       </property>
-      <property name="Size">@3,Width=977@3,Height=327</property>
+      <property name="Size">@3,Width=977@3,Height=520</property>
       <property name="ExpandButtonVisible">false</property>
       <property name="ExpandButtonMode">Normal</property>
       <property name="HeaderButtonsLocation">Default</property>
@@ -490,8 +490,8 @@
       <property name="TextToControlDistance">0</property>
       <property name="Spacing">0, 0, 0, 0</property>
       <property name="Padding">2, 2, 2, 2</property>
-      <property name="Location">@1,X=0@2,Y=72</property>
-      <property name="Size">@3,Width=977@3,Height=231</property>
+      <property name="Location">@1,X=0@2,Y=96</property>
+      <property name="Size">@3,Width=977@3,Height=400</property>
       <property name="ShowInCustomizationForm">true</property>
       <property name="Text">ArchivesSpace Results</property>
       <property name="CustomizationFormText">MySqlGrid</property>
@@ -569,7 +569,7 @@
       <property name="TextToControlDistance">3</property>
       <property name="Spacing">0, 0, 0, 0</property>
       <property name="Padding">2, 2, 2, 2</property>
-      <property name="Location">@1,X=0@3,Y=303</property>
+      <property name="Location">@1,X=0@3,Y=496</property>
       <property name="Size">@3,Width=977@2,Height=24</property>
       <property name="ShowInCustomizationForm">true</property>
       <property name="Text">Number of item founds:</property>
@@ -579,6 +579,85 @@
       <property name="TextLocation">Default</property>
     </property>
     <property name="Item7" isnull="true" iskey="true">
+      <property name="TypeName">AtlasSystems.Scripting.UI.AddonControls.TextEdit</property>
+      <property name="ControlName">barcode</property>
+      <property name="AllowHtmlStringInCaption">false</property>
+      <property name="TextAlignMode">UseParentOptions</property>
+      <property name="SizeConstraintsType">Default</property>
+      <property name="Image" isnull="true" />
+      <property name="ImageIndex">-1</property>
+      <property name="ImageAlignment">MiddleLeft</property>
+      <property name="ImageToTextDistance">5</property>
+      <property name="OptionsPrint" isnull="true" iskey="true">
+        <property name="TextToControlDistance">-1</property>
+        <property name="AllowPrint">true</property>
+        <property name="AppearanceItemCaption" isnull="true" iskey="true">
+          <property name="ForeColor" />
+          <property name="BorderColor" />
+          <property name="BackColor" />
+          <property name="BackColor2" />
+          <property name="Font">Tahoma, 8.25pt</property>
+          <property name="GradientMode">Horizontal</property>
+          <property name="FontSizeDelta">0</property>
+          <property name="FontStyleDelta">Regular</property>
+        </property>
+      </property>
+      <property name="MaxSize">@1,Width=0@2,Height=24</property>
+      <property name="MinSize">@3,Width=170@2,Height=24</property>
+      <property name="ControlAlignment">TopLeft</property>
+      <property name="ContentVisible">true</property>
+      <property name="TrimClientAreaToControl">true</property>
+      <property name="AllowGlyphSkinning">Default</property>
+      <property name="OptionsCustomization" isnull="true" iskey="true">
+        <property name="AllowDrag">Default</property>
+        <property name="AllowDrop">Default</property>
+      </property>
+      <property name="OptionsTableLayoutItem" isnull="true" iskey="true">
+        <property name="RowIndex">0</property>
+        <property name="RowSpan">1</property>
+        <property name="ColumnIndex">0</property>
+        <property name="ColumnSpan">1</property>
+      </property>
+      <property name="OptionsToolTip" isnull="true" iskey="true">
+        <property name="ToolTip" />
+        <property name="ToolTipTitle" />
+        <property name="ToolTipIconType">None</property>
+        <property name="ImmediateToolTip">false</property>
+        <property name="AllowHtmlString">Default</property>
+        <property name="IconToolTip" />
+        <property name="IconToolTipTitle" />
+        <property name="IconToolTipIconType">None</property>
+        <property name="EnableIconToolTip">true</property>
+        <property name="IconImmediateToolTip">false</property>
+        <property name="IconAllowHtmlString">Default</property>
+      </property>
+      <property name="Name">barcode</property>
+      <property name="AppearanceItemCaption" isnull="true" iskey="true">
+        <property name="ForeColor" />
+        <property name="BorderColor" />
+        <property name="BackColor" />
+        <property name="BackColor2" />
+        <property name="Font">Tahoma, 8.25pt</property>
+        <property name="GradientMode">Horizontal</property>
+        <property name="FontSizeDelta">0</property>
+        <property name="FontStyleDelta">Regular</property>
+      </property>
+      <property name="ParentName">Root</property>
+      <property name="TextVisible">true</property>
+      <property name="TextSize">@3,Width=113@2,Height=13</property>
+      <property name="TextToControlDistance">3</property>
+      <property name="Spacing">0, 0, 0, 0</property>
+      <property name="Padding">2, 2, 2, 2</property>
+      <property name="Location">@1,X=0@2,Y=72</property>
+      <property name="Size">@3,Width=977@2,Height=24</property>
+      <property name="ShowInCustomizationForm">true</property>
+      <property name="Text">Barcode</property>
+      <property name="CustomizationFormText">barcode</property>
+      <property name="StartNewLine">false</property>
+      <property name="Visibility">Always</property>
+      <property name="TextLocation">Default</property>
+    </property>
+    <property name="Item8" isnull="true" iskey="true">
       <property name="TypeName">TabbedGroup</property>
       <property name="MultiLine">Default</property>
       <property name="HeaderAutoFill">Default</property>
@@ -684,7 +763,7 @@
       <property name="StartNewLine">false</property>
       <property name="Visibility">Always</property>
     </property>
-    <property name="Item8" isnull="true" iskey="true">
+    <property name="Item9" isnull="true" iskey="true">
       <property name="TypeName">LayoutGroup</property>
       <property name="TabbedGroupParentName" />
       <property name="GroupBordersVisible">true</property>
@@ -849,7 +928,7 @@
       <property name="StartNewLine">false</property>
       <property name="Visibility">Always</property>
     </property>
-    <property name="Item9" isnull="true" iskey="true">
+    <property name="Item10" isnull="true" iskey="true">
       <property name="TypeName">LayoutGroup</property>
       <property name="TabbedGroupParentName" />
       <property name="GroupBordersVisible">true</property>
@@ -1014,7 +1093,7 @@
       <property name="StartNewLine">false</property>
       <property name="Visibility">Always</property>
     </property>
-    <property name="Item10" isnull="true" iskey="true">
+    <property name="Item11" isnull="true" iskey="true">
       <property name="TypeName">TabbedGroup</property>
       <property name="MultiLine">Default</property>
       <property name="HeaderAutoFill">Default</property>

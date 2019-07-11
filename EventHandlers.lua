@@ -18,6 +18,12 @@ function EADIDSubmitCheck(sender, args)
 	end
 end
 
+function BarcodeSubmitCheck(sender, args)
+	if tostring(args.KeyCode) == "Return: 13" then
+		performSearch(barcodeTerm, 'barcode')
+	end
+end
+
 
 
 function performSearch(field, fieldName)
@@ -28,15 +34,23 @@ function performSearch(field, fieldName)
 		if field == eadidTerm then
 			collectionTitle.Value = ''
 			searchTerm.Value = ''
+			barcodeTerm.Value = ''
 			res = getTopContainersByEADID(field.Value)
 		elseif field == collectionTitle then
 			eadidTerm.Value = ''
 			searchTerm.Value = ''
+			barcodeTerm.Value = ''
 			res = getTopContainersByTitle(field.Value)
 		elseif field == searchTerm then
 			collectionTitle.Value = ''
 			eadidTerm.Value = ''
+			barcodeTerm.Value = ''
 			res = getTopContainersByCallNumber(field.Value)
+		elseif field == barcodeTerm then
+			collectionTitle.Value = ''
+			searchTerm.Value = ''
+			eadidTerm.Value = ''
+			res = getTopContainersByBarcode(field.Value)
 		end
 
 		GetBoxes(convertResultsIntoDataTable(res), fieldName)
