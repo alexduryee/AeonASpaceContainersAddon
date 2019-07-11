@@ -405,80 +405,11 @@ function jsonArrayToDataTable(json_arr, repoCode)
 	local allRecords = {}
 	for i = 1, #json_arr do
 		local obj = json_arr[i]
-		local row = {}
-		
-		-- I have been checking all the Call number in ASPace, none of them had a comma.
-		row['callNumber'] = split(ExtractProperty(obj, 'title'), ',')[1]
-
-		row['collectionTitle'] = ExtractProperty(obj, 'collection_display_string_u_sstr')[1]
-
-
-		local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
-		
-		local indicator = ExtractProperty(jsonString, 'indicator')
-		local containers =  ExtractProperty(obj, 'type_enum_s')
-		local container = nil
-		if containers ~= nil then
-			container = containers[1]
+		local callNumbers = ExtractProperty(obj, 'collection_identifier_stored_u_sstr')
+		for _, cn in pairs(callNumbers) do
+			-- in the barcode case, one search result will be linked to one or more resources.
+			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, cn, repoCode)
 		end
-
-		local typeEnum = nil
-		if indicator ~= nil and container ~= nil then
-			-- concatenating the indicator with the container type.
-			typeEnum = container .. ' ' .. indicator
-			if isnumeric(indicator) then
-				indicator = tonumber(indicator)
-			else
-				indicator = 0
-			end
-		else
-			if not container then
-				-- failsafe so the sorting works later.
-				container = ''
-			end
-			typeEnum = container
-			-- sort nil is not stored inside the hidden indicator column
-			indicator = 0
-		end
-
-		row['hidden_indicator'] = indicator
-		row['hidden_container'] = container
-		row['enumeration'] = typeEnum
-		row['item_barcode'] = ExtractProperty(obj, 'barcode_u_sstr')[1]
-
-		-- apparently some locations can be empty!
-		row['location'] = ExtractProperty(obj, 'location_display_string_u_sstr')[1]
-
-		-- fetching this information from the 'restricted' field of the json embedded data 
-		local restricted = 'N'
-		if ExtractProperty(jsonString, 'restricted') then
-			restricted = 'Y'
-		end
-		row['restrictions'] = restricted
-		
-		-- all the ids are 
-		tcId = split(ExtractProperty(obj, 'id'), '/')
-		row['item_id'] = tcId[#tcId]
-
-		local seriesStr = ''
-		local seriesArray = ExtractProperty(jsonString, 'series')
-		if #seriesArray > 0 then
-			seriesStr = ExtractProperty(seriesArray[1], 'display_string')
-
-			for i = 2,#seriesArray do
-				local displayString = ExtractProperty(seriesArray[i], 'display_string')
-				if displayString ~= '' and displayString ~= nil then
-					seriesStr = seriesStr .. '  ' .. displayString
-				end
-			end 
-			seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
-		end
-		row['series'] = seriesStr
-
-		local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
-		row['profile'] = profile
-		row['repoCode'] = repoCode
-		allRecords[i] = row
 	end
 
 
@@ -531,6 +462,82 @@ function jsonArrayToDataTable(json_arr, repoCode)
 	end
 
 	return asItemTable
+end
+
+
+function extractTopContainersInformation(obj, callNumber, repoCode)
+	local row = {}
+	row['callNumber'] = callNumber
+
+	row['collectionTitle'] = ExtractProperty(obj, 'collection_display_string_u_sstr')[1]
+
+
+	local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
+
+	local indicator = ExtractProperty(jsonString, 'indicator')
+	local containers =  ExtractProperty(obj, 'type_enum_s')
+	local container = nil
+	if containers ~= nil then
+		container = containers[1]
+	end
+
+	local typeEnum = nil
+	if indicator ~= nil and container ~= nil then
+		-- concatenating the indicator with the container type.
+		typeEnum = container .. ' ' .. indicator
+		if isnumeric(indicator) then
+			indicator = tonumber(indicator)
+		else
+			indicator = 0
+		end
+	else
+		if not container then
+			-- failsafe so the sorting works later.
+			container = ''
+		end
+		typeEnum = container
+		-- sort nil is not stored inside the hidden indicator column
+		indicator = 0
+	end
+
+	row['hidden_indicator'] = indicator
+	row['hidden_container'] = container
+	row['enumeration'] = typeEnum
+	row['item_barcode'] = ExtractProperty(obj, 'barcode_u_sstr')[1]
+
+	-- apparently some locations can be empty!
+	row['location'] = ExtractProperty(obj, 'location_display_string_u_sstr')[1]
+
+	-- fetching this information from the 'restricted' field of the json embedded data 
+	local restricted = 'N'
+	if ExtractProperty(jsonString, 'restricted') then
+		restricted = 'Y'
+	end
+	row['restrictions'] = restricted
+
+	-- all the ids are 
+	tcId = split(ExtractProperty(obj, 'id'), '/')
+	row['item_id'] = tcId[#tcId]
+
+	local seriesStr = ''
+	local seriesArray = ExtractProperty(jsonString, 'series')
+	if #seriesArray > 0 then
+		seriesStr = ExtractProperty(seriesArray[1], 'display_string')
+
+		for i = 2,#seriesArray do
+			local displayString = ExtractProperty(seriesArray[i], 'display_string')
+			if displayString ~= '' and displayString ~= nil then
+				seriesStr = seriesStr .. '  ' .. displayString
+			end
+		end 
+		seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
+	end
+	row['series'] = seriesStr
+
+	local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
+	row['profile'] = profile
+	row['repoCode'] = repoCode
+	return row
 end
 
 function GetBoxes(tab, itemQuery)
