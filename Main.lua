@@ -222,7 +222,6 @@ end
 function getTopContainersByEADID(eadid)
 	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
 	local repoCode = string.match(eadid, '[a-zA-Z][a-zA-Z][a-zA-Z]')
-	interfaceMngr:ShowMessage(repoCode, 'eadid filtered')
 	if repoCode == nil or repoCode == '' then
 		-- need to return an empty table as the return argument will get passed to convertResultsIntoDataTable
 		-- which expect to have a table as argument.
@@ -234,7 +233,6 @@ function getTopContainersByEADID(eadid)
 	end
 
 	local repoId = settings["repoTable"][repoCode]
-	interfaceMngr:ShowMessage(repoId, 'repoId')
 	
 	if repoId == nil or repoId == '' then
 		return {}
