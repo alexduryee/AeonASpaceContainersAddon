@@ -11,7 +11,6 @@ settings["AddonName"] = globalInterfaceMngr.environment.Info.Name
 settings["AddonVersion"] = globalInterfaceMngr.environment.Info.Version 
 settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion 
 
-
 LogDebug("Launching ASpace Basic Plugin") 
 LogDebug("Loading Assemblies") 
 LogDebug("Loading System Data Assembly") 
@@ -39,8 +38,6 @@ require "Atlas-Addons-Lua-ParseJson.JsonParser"
 
 local form = nil 
 interfaceMngr = nil 
-
-
 
 function Init()
 
@@ -99,12 +96,14 @@ function Init()
 	eadidTerm = form:CreateTextEdit('eadid', "EADID") 
 	eadidTerm.Editor.KeyDown:Add(EADIDSubmitCheck)
 
+	barcodeTerm = form:CreateTextEdit("barcode", "Barcode")
+	barcodeTerm.Editor.KeyDown:Add(BarcodeSubmitCheck)
 
 	-- This specifies the layout of the different component of the addon (the grid, the ribbons etc..) the default placement being rather poor.
 	form:LoadLayout("layout.xml") 
 
 	form:Show() 
-	local result = nil 
+	local result = {} 
 	local searchTypeStr = 'call number'
 
 	if callNumber == nil or callNumber == ''  then
@@ -117,6 +116,7 @@ function Init()
 	else
 		result = getTopContainersByCallNumber(callNumber)
 	end
+
 	local tab = convertResultsIntoDataTable(result)
 
 	GetBoxes(tab, searchTypeStr)
@@ -140,12 +140,14 @@ function containersSearch()
 	titleIsFilled = isFieldFilled(collectionTitle)
 	eadIsFilled = isFieldFilled(eadidTerm)
 	callIsFilled = isFieldFilled(searchTerm)
+	barcodeIsFilled = isFieldFilled(barcodeTerm)
+
 
 	function countIfTrue(cond) 
 		if cond then return 1 else return 0 end
 	end
 
-	local nField = countIfTrue(titleIsFilled) + countIfTrue(eadIsFilled) + countIfTrue(callIsFilled)
+	local nField = countIfTrue(titleIsFilled) + countIfTrue(eadIsFilled) + countIfTrue(callIsFilled) + countIfTrue(barcodeIsFilled)
 	if nField ~= 1 then
 		interfaceMngr:ShowMessage('Only one search field should be filled for containers search', 'Cannot retrieve search results')
 		return
@@ -159,26 +161,17 @@ function containersSearch()
 		performSearch(collectionTitle, 'title')
 	elseif eadIsFilled then
 		performSearch(eadidTerm, 'ead_id')
-	else
+	elseif callIsFilled then
 		performSearch(searchTerm, 'call number')
+	else
+		performSearch(barcodeTerm, 'barcode')
 	end
 end
-
 
 function getFullResourceById(repoID, resourceId)
 	local searchResourceReq = 'repositories/' .. repoID .. '/resources/' .. resourceId
 	return getElementBySearchQuery(searchResourceReq)
 end
-
-
-function getResourceIdByCallNumber(callNumb, repoId)
-	results = getResourceByCallNumber(callNumb, repoId)
-	resource_id = ExtractProperty(results, 'id')
-	pathSplit = split(resource_id, '/')
-	actual_id = pathSplit[#pathSplit]
-	return actual_id
-end
-
 
 function getResourceByCallNumber(callNumb, repoId)
 	local searchResourceReq = 'repositories/' .. repoId .. '/search?page=1&q=four_part_id:("' .. callNumb .. '")&type[]=resource'
@@ -201,49 +194,72 @@ function getTopContainersByCallNumber(callNumb)
 	return getTopContainersBySearchQuery('q=collection_identifier_u_stext:("'..callNumb..'")')
 end
 
--- function getTopContainersByCallNumberUnfuzzy(callNumb)
---	return getTopContainersBySearchQuery('q=collection_identifier_stored_u_sstr:("'..callNumb..'")')
--- end
-
 function getTopContainersByTitle(title)
 	return getTopContainersBySearchQuery('q=collection_display_string_u_sstr:("'..title..'")')
 end
 
+function getTopContainersByBarcode(barcode)
+	return getTopContainersBySearchQuery('q=barcode_u_sstr:("'..barcode..'")')
+end
+
 function getTopContainersByEADID(eadid)
 	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
-	local callNumber = getResourceCallNumberByEADID(eadid:lower(), repoId)
-	if callNumber == nil then
-		return nil
+	local repoCode = string.match(eadid, '[a-zA-Z][a-zA-Z][a-zA-Z]')
+	if repoCode == nil or repoCode == '' then
+		-- need to return an empty table as the return argument will get passed to convertResultsIntoDataTable
+		-- which expect to have a table as argument.
+		return {}
+	else
+		-- need to be sure the three first letters of the eadid corresponds to the 
+		-- repository code stored in the setting's repoTable (where they are all uppercased) 
+		repoCode = repoCode:upper()
 	end
-	return getTopContainersByCallNumberUnfuzzy(callNumber)
+
+	local repoId = settings["repoTable"][repoCode]
+	
+	if repoId == nil or repoId == '' then
+		return {}
+	end
+	local resourceId = getResourceIdByEADID(eadid:lower(), repoId)
+	if resourceId == nil then
+		return {}
+	end
+	return getTopContainersByResourceId(resourceId, repoCode)
 end
+
+function getTopContainersByResourceId(resourceId, repoCode)
+	local resultTable = {}
+	local repoId = split(resourceId, '/')[2]
+	local searchTopContReq = 'repositories/' .. repoId .. '/top_containers/search?q=collection_uri_u_sstr:("'..resourceId..'")'
+	local res = getElementBySearchQuery(searchTopContReq)
+	getResultAndPopulateTableOfJson(searchTopContReq, resultTable, repoCode)
+	return resultTable
+end
+
 
 function getTopContainersBySearchQuery(searchQuery)
 	local resultTable = {}
 	for code, id in pairs(settings['repoTable']) do
 		resultTable[code] = nil
 		local searchResourceReq = 'repositories/' .. id .. '/top_containers/search?' .. searchQuery
-		local res = getElementBySearchQuery(searchResourceReq)
-
-		-- to reformat
-		local response = ExtractProperty(res, "response")
-		if response ~= '' then
-			local numFound = ExtractProperty(response, "numFound")
-			if numFound ~= '' and numFound > 1 then
-				local docs = ExtractProperty(response, "docs")
-				resultTable[code] = docs
-			end
-		end
+		getResultAndPopulateTableOfJson(searchResourceReq, resultTable, code)
 	end
  	return resultTable
 end
 
-function getResourceCallNumberByEADID(eadid)
-	local repoCode = string.match(eadid, '[a-z][a-z][a-z]')
-	local repoId = settings["repoTable"][string.upper(repoCode)]
-	if not repoId then
-		return nil
+function getResultAndPopulateTableOfJson(searchResourceQuery, jsonTable, repoCode)
+	local res = getElementBySearchQuery(searchResourceQuery)
+	local response = ExtractProperty(res, "response")
+	if response ~= '' then
+		local numFound = ExtractProperty(response, "numFound")
+		if numFound ~= '' and numFound > 0 then
+			local docs = ExtractProperty(response, "docs")
+			jsonTable[repoCode] = docs
+		end
 	end
+end
+
+function getResourceIdByEADID(eadid, repoId)
 	local searchResourceReq = 'repositories/' .. repoId .. '/search?page=1&q=ead_id:("' .. eadid .. '")&type[]=resource'
 	local res = getElementBySearchQuery(searchResourceReq)
 
@@ -258,7 +274,7 @@ function getResourceCallNumberByEADID(eadid)
 		return nil
 	end
 	
-	return ExtractProperty(results[1], "identifier")
+	return ExtractProperty(results[1], "id")
 end
 
 function getElementBySearchQuery(searchQuery)
@@ -277,46 +293,6 @@ function getElementBySearchQuery(searchQuery)
 	end
 	return res
 end
-
-function checkRepoCode(repoCode)
-	local transRepoCode = GetFieldValue("Transaction", "Location") 
-	if transRepoCode == nil or transRepoCode == '' then
-		return -- in a hypothetical request with no repo code. 
-	end
-	if transRepoCode ~= repoCode then
-		interfaceMngr:ShowMessage('You are not authorized to make top containers search on this repository', 'Warning')
-		return 
-	end
-end
-
-function getRepoCode(repoID)
-	local searchResourceReq = 'repositories/' .. repoID
-	local res = getElementBySearchQuery(searchResourceReq)
-	return ExtractProperty(res, "repo_code")
-end
-
-
-function getRepoId(repoCode)
-	local searchResourceReq = 'repositories'
-	local res = getElementBySearchQuery(searchResourceReq)
-	for i=1, #res do
-		local currRepo = res[i]
-		if ExtractProperty(currRepo, 'repo_code') == repoCode then
-			local repoUri = split(ExtractProperty(currRepo, 'uri'), '/')
-			return repoUri[#repoUri] 
-		end
-	end
-	return nil
-end
-
-
--- cannot use '#' if the table is not numerically indexed in sequence. 
-function tableLength(T)
-  local count = 0
-  for _ in pairs(T) do count = count + 1 end
-  return count
-end
-
 
 function getListOfRepo()
 	local resTable = {}
@@ -372,80 +348,17 @@ function jsonArrayToDataTable(json_arr, repoCode)
 	local allRecords = {}
 	for i = 1, #json_arr do
 		local obj = json_arr[i]
-		local row = {}
-		
-		-- I have been checking all the Call number in ASPace, none of them had a comma.
-		row['callNumber'] = split(ExtractProperty(obj, 'title'), ',')[1]
-
-		row['collectionTitle'] = ExtractProperty(obj, 'collection_display_string_u_sstr')[1]
-
-
-		local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
-		
-		local indicator = ExtractProperty(jsonString, 'indicator')
-		local containers =  ExtractProperty(obj, 'type_enum_s')
-		local container = nil
-		if containers ~= nil then
-			container = containers[1]
+		local callNumbers = ExtractProperty(obj, 'collection_identifier_stored_u_sstr')
+		local titles = ExtractProperty(obj, 'collection_display_string_u_sstr')
+		local docIds = ExtractProperty(obj, 'collection_uri_u_sstr')
+		for i=1,#callNumbers do
+			local currCN = callNumbers[i]
+			local currTitle = titles[i]
+			local currDocIds = docIds[i]
+			-- in the barcode case, one search result will be linked to one or more resources.
+			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, currCN, currTitle, currDocIds, repoCode)
+			-- a[#a+1] is an efficient way to append an element at the end of an array-like
 		end
-
-		local typeEnum = nil
-		if indicator ~= nil and container ~= nil then
-			-- concatenating the indicator with the container type.
-			typeEnum = container .. ' ' .. indicator
-			if isnumeric(indicator) then
-				indicator = tonumber(indicator)
-			else
-				indicator = 0
-			end
-		else
-			if not container then
-				-- failsafe so the sorting works later.
-				container = ''
-			end
-			typeEnum = container
-			-- sort nil is not stored inside the hidden indicator column
-			indicator = 0
-		end
-
-		row['hidden_indicator'] = indicator
-		row['hidden_container'] = container
-		row['enumeration'] = typeEnum
-		row['item_barcode'] = ExtractProperty(obj, 'barcode_u_sstr')[1]
-
-		-- apparently some locations can be empty!
-		row['location'] = ExtractProperty(obj, 'location_display_string_u_sstr')[1]
-
-		-- fetching this information from the 'restricted' field of the json embedded data 
-		local restricted = 'N'
-		if ExtractProperty(jsonString, 'restricted') then
-			restricted = 'Y'
-		end
-		row['restrictions'] = restricted
-		
-		-- all the ids are 
-		tcId = split(ExtractProperty(obj, 'id'), '/')
-		row['item_id'] = tcId[#tcId]
-
-		local seriesStr = ''
-		local seriesArray = ExtractProperty(jsonString, 'series')
-		if #seriesArray > 0 then
-			seriesStr = ExtractProperty(seriesArray[1], 'display_string')
-
-			for i = 2,#seriesArray do
-				local displayString = ExtractProperty(seriesArray[i], 'display_string')
-				if displayString ~= '' and displayString ~= nil then
-					seriesStr = seriesStr .. '  ' .. displayString
-				end
-			end 
-			seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
-		end
-		row['series'] = seriesStr
-
-		local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
-		row['profile'] = profile
-		row['repoCode'] = repoCode
-		allRecords[i] = row
 	end
 
 
@@ -481,6 +394,7 @@ function jsonArrayToDataTable(json_arr, repoCode)
 	asItemTable.Columns:Add("series")
 	asItemTable.Columns:Add("profile")
 	asItemTable.Columns:Add("repo_code")
+	asItemTable.Columns:Add("doc_path")
 
 	for _, value in ipairs(allRecords) do
 		local row = asItemTable:NewRow()
@@ -494,10 +408,102 @@ function jsonArrayToDataTable(json_arr, repoCode)
 		setItemNode(row,'series', value['series'])
 		setItemNode(row,'profile', value['profile'])
 		setItemNode(row,'repo_code', value['repoCode'])
+		setItemNode(row, 'doc_path', value['docPath']) -- hidden value
 		asItemTable.Rows:Add(row)
 	end
 
 	return asItemTable
+end
+
+function extractTopContainersInformation(obj, callNumber, title, docId, repoCode)
+	local row = {}
+	row['callNumber'] = truncateIfNotNil(callNumber)
+
+	row['collectionTitle'] = truncateIfNotNil(title)
+
+
+	local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
+
+	local indicator = ExtractProperty(jsonString, 'indicator')
+	local containers =  ExtractProperty(obj, 'type_enum_s')
+	local container = nil
+	if containers ~= nil then
+		container = containers[1]
+	end
+
+	local typeEnum = nil
+	if indicator ~= nil and container ~= nil then
+		-- concatenating the indicator with the container type.
+		typeEnum = container .. ' ' .. indicator
+		if isnumeric(indicator) then
+			indicator = tonumber(indicator)
+		else
+			indicator = 0
+		end
+	else
+		if not container then
+			-- failsafe so the sorting works later.
+			container = ''
+		end
+		typeEnum = container
+		-- sort nil is not stored inside the hidden indicator column
+		indicator = 0
+	end
+
+	row['hidden_indicator'] = truncateIfNotNil(indicator)
+	row['hidden_container'] = truncateIfNotNil(container)
+	row['enumeration'] = truncateIfNotNil(typeEnum)
+	row['item_barcode'] = ExtractProperty(obj, 'barcode_u_sstr')[1]
+
+	-- apparently some locations can be empty!
+	row['location'] = truncateIfNotNil(ExtractProperty(obj, 'location_display_string_u_sstr')[1])
+
+	-- fetching this information from the 'restricted' field of the json embedded data 
+	local restricted = 'N'
+	if ExtractProperty(jsonString, 'restricted') then
+		restricted = 'Y'
+	end
+	row['restrictions'] = restricted
+
+	-- all the ids are prepended with the database path.
+	-- format of a top container path: /repositories/[repoID]/top_containers/[TopContainerID]
+	local tcId = split(ExtractProperty(obj, 'id'), '/')
+	row['item_id'] = tcId[#tcId]
+
+	--useful to make a callback when making the import later (hidden value on the grid)
+	row['docPath'] = docId
+
+	local seriesStr = ''
+	local seriesArray = ExtractProperty(jsonString, 'series')
+	if #seriesArray > 0 then
+		seriesStr = ExtractProperty(seriesArray[1], 'display_string')
+
+		for i = 2,#seriesArray do
+			local displayString = ExtractProperty(seriesArray[i], 'display_string')
+			if displayString ~= '' and displayString ~= nil then
+				seriesStr = seriesStr .. '  ' .. displayString
+			end
+		end 
+	end
+	row['series'] = truncateIfNotNil(seriesStr)
+
+	local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
+	row['profile'] = truncateIfNotNil(profile)
+	row['repoCode'] = repoCode
+	return row
+end
+
+function truncateIfNotNil(value)
+	-- If string are longer than 255 char, Aeon will not import them in the grid.  
+	if type(value) == 'string' then
+		if value ~= nil and value ~= '' then
+			return value:sub(0,255)
+		else
+			return ''
+		end
+	else
+		return value
+	end
 end
 
 function GetBoxes(tab, itemQuery)
@@ -519,7 +525,6 @@ function GetBoxes(tab, itemQuery)
 			LogDebug("No results returned from webservice on box search") 
 		end
 end
-
 
 function importContainer() DoItemImport(false) end
 
@@ -544,6 +549,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	local itemInfo1 = itemRow:get_Item("restrictions")
 	local series = itemRow:get_Item("series")
 	local repoCode = itemRow:get_Item("repo_code")
+	local recordId = itemRow:get_Item("item_id")
 
 	-- Update the item object with the new values.
 	function setFieldValueIfNotNil(formName, fieldName, value)
@@ -560,13 +566,19 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	
 
 	if withCitation then
-		setFieldValueIfNotNil("Transaction", "CallNumber", callNumber) 
-		setFieldValueIfNotNil("Transaction", "ItemCitation", series)
+		setFieldValueIfNotNil("Transaction", "CallNumber", callNumber)
 		setFieldValueIfNotNil("Transaction", "ItemTitle", collectionTitle)
+		setFieldValueIfNotNil("Transaction", "Location", repoCode)
 
-		local res = getResourceByCallNumber(callNumber, settings["repoTable"][repoCode])
-		-- a use case for res to be nil: if the resource is actually an accession.
-		if res ~= nil then
+		local documentPath = itemRow:get_Item("doc_path")
+		-- format of a document path: /repositories/[repoID]/[resources|accessions]/[documentID]
+		
+		local documentType = split(documentPath, '/')
+		if documentType[3] == 'resources' then
+
+			setFieldValueIfNotNil("Transaction", "ItemCitation", series)
+			
+			local res = getResourceByCallNumber(callNumber, settings["repoTable"][repoCode])
 			local creators = ExtractProperty(res, 'creators') 
 			local creator = nil
 			if creators ~= nil then
@@ -576,10 +588,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 			
 			local resourceURL = ExtractProperty(res, 'id')
 			local resourceElems = split(resourceURL, '/')
-			local repoCode = getRepoCode(resourceElems[2])
 			local resourceId = resourceElems[#resourceElems]
-			setFieldValueIfNotNil("Transaction", "Location", repoCode)
-
 			local repoId = settings["repoTable"][repoCode]
 			local resourceObj = getFullResourceById(repoId, resourceId)
 			local notes = ExtractProperty(resourceObj, 'notes')
@@ -610,6 +619,21 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 					setFieldValueIfNotNil('Transaction', 'ItemInfo2', truncated)
 				end				
 			end
+		elseif documentType[3] == 'accessions' then
+
+			-- there is only two types of document: resources and accessions
+			-- if the else part is reached, that means the current document is an accession.
+			local creatorApiPath = getAccessionCreatorAgentById(documentType[#documentType], settings["repoTable"][repoCode])
+			if creatorApiPath ~= nil and creatorApiPath ~= '' then
+				local agentJson = getElementBySearchQuery(creatorApiPath)
+				if agentJson ~= nil and agentJson ~= '' then
+					local creatorNames = ExtractProperty(agentJson, 'names')
+					if creatorNames ~= nil and creatorNames ~= '' and #creatorNames > 0 then
+						setFieldValueIfNotNil("Transaction", "ItemAuthor", ExtractProperty(creatorNames[1], 'sort_name'))
+					end
+				end
+			end
+
 		end
 	end
 
@@ -617,6 +641,21 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	ExecuteCommand("SwitchTab", {"Detail"})
 end
 
+function getAccessionCreatorAgentById(accessId, repoId)
+	local searchQuery = '/repositories/'..repoId..'/accessions/'..accessId
+	local accessJson = getElementBySearchQuery(searchQuery)
+	if accessJson ~= nil then
+		local linked_agents = ExtractProperty(accessJson, 'linked_agents')
+		if linked_agents ~= nil then
+			for _, v in pairs(linked_agents) do
+				if ExtractProperty(v, 'role') == 'creator' then
+					return ExtractProperty(v, 'ref')
+				end
+			end
+		end
+	end
+	return nil
+end
 
 function extractNoteContent(notesArray, jsonField, fieldValue, toExtract)
 	for i = 1, #notesArray do
@@ -628,7 +667,6 @@ function extractNoteContent(notesArray, jsonField, fieldValue, toExtract)
 	return nil
 end
 
--- BELOW ARE ATLAS ASPACE/AEON FUNCTIONS/METHODS
 function ExtractProperty(object, property)
     if object then
         return EmptyStringIfNil(object[property]) 

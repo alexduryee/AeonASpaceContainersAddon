@@ -22,8 +22,15 @@ function findObjectTypeInCollection(obj, typestr)
 	if idx == ctrlCount then
 		return nil;
 	end
-
 end
+
+-- cannot use '#' if the table is not numerically indexed in sequence. 
+function tableLength(T)
+  local count = 0
+  for _ in pairs(T) do count = count + 1 end
+  return count
+end
+
 
 function getLength(obj)
 	local idx = 0;

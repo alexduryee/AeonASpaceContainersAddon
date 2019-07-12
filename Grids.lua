@@ -155,4 +155,16 @@ function fillItemTable(gridControl)
 	gridColumn.VisibleIndex = 9 
 	gridColumn.OptionsColumn.ReadOnly = true 
 
+
+	local gridColumn 
+	gridColumn = gridView.Columns:Add() 
+	gridColumn.Caption = "HiddenDocPath" 
+	gridColumn.FieldName = "doc_path" 
+	gridColumn.Name = "gcDoc_path" 
+	gridColumn.Width = 0
+	gridColumn.Visible = true 
+	gridColumn.VisibleIndex = -1 -- hids this grid. 
+	gridColumn.OptionsColumn.ReadOnly = true 
+
+
 end
