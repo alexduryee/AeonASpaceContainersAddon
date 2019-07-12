@@ -470,9 +470,9 @@ end
 
 function extractTopContainersInformation(obj, callNumber, title, repoCode)
 	local row = {}
-	row['callNumber'] = callNumber
+	row['callNumber'] = truncateIfNotNil(callNumber)
 
-	row['collectionTitle'] = title
+	row['collectionTitle'] = truncateIfNotNil(title)
 
 
 	local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
@@ -503,13 +503,13 @@ function extractTopContainersInformation(obj, callNumber, title, repoCode)
 		indicator = 0
 	end
 
-	row['hidden_indicator'] = indicator
-	row['hidden_container'] = container
-	row['enumeration'] = typeEnum
+	row['hidden_indicator'] = truncateIfNotNil(indicator)
+	row['hidden_container'] = truncateIfNotNil(container)
+	row['enumeration'] = truncateIfNotNil(typeEnum)
 	row['item_barcode'] = ExtractProperty(obj, 'barcode_u_sstr')[1]
 
 	-- apparently some locations can be empty!
-	row['location'] = ExtractProperty(obj, 'location_display_string_u_sstr')[1]
+	row['location'] = truncateIfNotNil(ExtractProperty(obj, 'location_display_string_u_sstr')[1])
 
 	-- fetching this information from the 'restricted' field of the json embedded data 
 	local restricted = 'N'
@@ -533,14 +533,26 @@ function extractTopContainersInformation(obj, callNumber, title, repoCode)
 				seriesStr = seriesStr .. '  ' .. displayString
 			end
 		end 
-		seriesStr = seriesStr:sub(0, 255) -- truncating so the import will work later.
 	end
-	row['series'] = seriesStr
+	row['series'] = truncateIfNotNil(seriesStr)
 
 	local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
-	row['profile'] = profile
+	row['profile'] = truncateIfNotNil(profile)
 	row['repoCode'] = repoCode
 	return row
+end
+
+function truncateIfNotNil(value)
+	-- If string are longer than 255 char, Aeon will not import them in the grid.  
+	if type(value) == 'string' then
+		if value ~= nil and value ~= '' then
+			return value:sub(0,255)
+		else
+			return ''
+		end
+	else
+		return value
+	end
 end
 
 function GetBoxes(tab, itemQuery)
@@ -611,8 +623,8 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 		local documentPath = retrieveDocumentPathByTCID(settings["repoTable"][repoCode], recordId)
 		-- format of a document path: /repositories/[repoID]/[resources|accessions]/[documentID]
 		
-		local documentType = split(documentPath, '/')[3]
-		if documentType == 'resources' then
+		local documentType = split(documentPath, '/')
+		if documentType[3] == 'resources' then
 
 			setFieldValueIfNotNil("Transaction", "ItemCitation", series)
 			
@@ -657,6 +669,21 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 					setFieldValueIfNotNil('Transaction', 'ItemInfo2', truncated)
 				end				
 			end
+		elseif documentType[3] == 'accessions' then
+
+			-- there is only two types of document: resources and accessions
+			-- if the else part is reached, that means the current document is an accession.
+			local creatorApiPath = getAccessionCreatorAgentById(documentType[#documentType], settings["repoTable"][repoCode])
+			if creatorApiPath ~= nil and creatorApiPath ~= '' then
+				local agentJson = getElementBySearchQuery(creatorApiPath)
+				if agentJson ~= nil and agentJson ~= '' then
+					local creatorNames = ExtractProperty(agentJson, 'names')
+					if creatorNames ~= nil and creatorNames ~= '' and #creatorNames > 0 then
+						setFieldValueIfNotNil("Transaction", "ItemAuthor", ExtractProperty(creatorNames[1], 'sort_name'))
+					end
+				end
+			end
+
 		end
 	end
 
@@ -664,6 +691,22 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	ExecuteCommand("SwitchTab", {"Detail"})
 end
 
+
+function getAccessionCreatorAgentById(accessId, repoId)
+	local searchQuery = '/repositories/'..repoId..'/accessions/'..accessId
+	local accessJson = getElementBySearchQuery(searchQuery)
+	if accessJson ~= nil then
+		local linked_agents = ExtractProperty(accessJson, 'linked_agents')
+		if linked_agents ~= nil then
+			for _, v in pairs(linked_agents) do
+				if ExtractProperty(v, 'role') == 'creator' then
+					return ExtractProperty(v, 'ref')
+				end
+			end
+		end
+	end
+	return nil
+end
 
 function retrieveDocumentPathByTCID(repoId, recordId)
 	local searchResourceReq = 'repositories/' .. repoId .. '/top_containers/'..recordId
