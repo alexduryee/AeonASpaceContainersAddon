@@ -350,11 +350,14 @@ function jsonArrayToDataTable(json_arr, repoCode)
 		local obj = json_arr[i]
 		local callNumbers = ExtractProperty(obj, 'collection_identifier_stored_u_sstr')
 		local titles = ExtractProperty(obj, 'collection_display_string_u_sstr')
+		local docIds = ExtractProperty(obj, 'collection_uri_u_sstr')
 		for i=1,#callNumbers do
 			local currCN = callNumbers[i]
 			local currTitle = titles[i]
+			local currDocIds = docIds[i]
 			-- in the barcode case, one search result will be linked to one or more resources.
-			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, currCN, currTitle, repoCode)
+			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, currCN, currTitle, currDocIds, repoCode)
+			-- a[#a+1] is an efficient way to append an element at the end of an array-like
 		end
 	end
 
@@ -391,6 +394,7 @@ function jsonArrayToDataTable(json_arr, repoCode)
 	asItemTable.Columns:Add("series")
 	asItemTable.Columns:Add("profile")
 	asItemTable.Columns:Add("repo_code")
+	asItemTable.Columns:Add("doc_path")
 
 	for _, value in ipairs(allRecords) do
 		local row = asItemTable:NewRow()
@@ -404,13 +408,14 @@ function jsonArrayToDataTable(json_arr, repoCode)
 		setItemNode(row,'series', value['series'])
 		setItemNode(row,'profile', value['profile'])
 		setItemNode(row,'repo_code', value['repoCode'])
+		setItemNode(row, 'doc_path', value['docPath']) -- hidden value
 		asItemTable.Rows:Add(row)
 	end
 
 	return asItemTable
 end
 
-function extractTopContainersInformation(obj, callNumber, title, repoCode)
+function extractTopContainersInformation(obj, callNumber, title, docId, repoCode)
 	local row = {}
 	row['callNumber'] = truncateIfNotNil(callNumber)
 
@@ -460,9 +465,13 @@ function extractTopContainersInformation(obj, callNumber, title, repoCode)
 	end
 	row['restrictions'] = restricted
 
-	-- all the ids are prepended with the database path. 
-	tcId = split(ExtractProperty(obj, 'id'), '/')
+	-- all the ids are prepended with the database path.
+	-- format of a top container path: /repositories/[repoID]/top_containers/[TopContainerID]
+	local tcId = split(ExtractProperty(obj, 'id'), '/')
 	row['item_id'] = tcId[#tcId]
+
+	--useful to make a callback when making the import later (hidden value on the grid)
+	row['docPath'] = docId
 
 	local seriesStr = ''
 	local seriesArray = ExtractProperty(jsonString, 'series')
@@ -561,7 +570,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 		setFieldValueIfNotNil("Transaction", "ItemTitle", collectionTitle)
 		setFieldValueIfNotNil("Transaction", "Location", repoCode)
 
-		local documentPath = retrieveDocumentPathByTCID(settings["repoTable"][repoCode], recordId)
+		local documentPath = itemRow:get_Item("doc_path")
 		-- format of a document path: /repositories/[repoID]/[resources|accessions]/[documentID]
 		
 		local documentType = split(documentPath, '/')
@@ -646,16 +655,6 @@ function getAccessionCreatorAgentById(accessId, repoId)
 		end
 	end
 	return nil
-end
-
-function retrieveDocumentPathByTCID(repoId, recordId)
-	local searchResourceReq = 'repositories/' .. repoId .. '/top_containers/'..recordId
-	local res = getElementBySearchQuery(searchResourceReq)
-	local collInfo = ExtractProperty(res, "collection")
-	if collInfo ~= nil then
-		local ref = ExtractProperty(collInfo[1], 'ref')
-		return ref
-	end
 end
 
 function extractNoteContent(notesArray, jsonField, fieldValue, toExtract)
