@@ -16,10 +16,3 @@ Depending on the context such a fuzzy might not be wanted but in the context of 
 ### Collection Title Search
 
 In total opposition to the call number search, searching on this field is extremely strict. Getting top containers by searching through this field requires an exact match between the search token and the resource's collection title. Meaning the casing needs to be respected, and user can not get results containing the search token as a substring.
-
-
-### EADID Search
-
-The current way to get top containers through their resource's EADID is to get the resource's call number corresponding the EADID search token, and then reduce it to a Call Number search to get all the top containers associated to this call number. However considering how substring search is possible with the Call Number search this implies some results will not correspond to the EADID entered as a search token. If the EADID entered was "bak00206" and it corresponds to the call number "Arch GA 8", it will also get top containers associated to the resource whose call number are "Arch GA 8X", with X being any number between 0 and 9. And those resource does not share the same EADID as "Arch GA 8". 
-
-Some investigation might be needed to find a better way to do top container search using the EADID, but to the best of our knowledge, it is the best way to offer such a functionnality.
