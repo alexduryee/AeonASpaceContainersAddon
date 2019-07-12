@@ -11,7 +11,6 @@ settings["AddonName"] = globalInterfaceMngr.environment.Info.Name
 settings["AddonVersion"] = globalInterfaceMngr.environment.Info.Version 
 settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion 
 
-
 LogDebug("Launching ASpace Basic Plugin") 
 LogDebug("Loading Assemblies") 
 LogDebug("Loading System Data Assembly") 
@@ -39,8 +38,6 @@ require "Atlas-Addons-Lua-ParseJson.JsonParser"
 
 local form = nil 
 interfaceMngr = nil 
-
-
 
 function Init()
 
@@ -171,21 +168,10 @@ function containersSearch()
 	end
 end
 
-
 function getFullResourceById(repoID, resourceId)
 	local searchResourceReq = 'repositories/' .. repoID .. '/resources/' .. resourceId
 	return getElementBySearchQuery(searchResourceReq)
 end
-
-
-function getResourceIdByCallNumber(callNumb, repoId)
-	results = getResourceByCallNumber(callNumb, repoId)
-	resource_id = ExtractProperty(results, 'id')
-	pathSplit = split(resource_id, '/')
-	actual_id = pathSplit[#pathSplit]
-	return actual_id
-end
-
 
 function getResourceByCallNumber(callNumb, repoId)
 	local searchResourceReq = 'repositories/' .. repoId .. '/search?page=1&q=four_part_id:("' .. callNumb .. '")&type[]=resource'
@@ -208,7 +194,6 @@ function getTopContainersByCallNumber(callNumb)
 	return getTopContainersBySearchQuery('q=collection_identifier_u_stext:("'..callNumb..'")')
 end
 
-
 function getTopContainersByTitle(title)
 	return getTopContainersBySearchQuery('q=collection_display_string_u_sstr:("'..title..'")')
 end
@@ -216,8 +201,6 @@ end
 function getTopContainersByBarcode(barcode)
 	return getTopContainersBySearchQuery('q=barcode_u_sstr:("'..barcode..'")')
 end
-
-
 
 function getTopContainersByEADID(eadid)
 	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
@@ -310,46 +293,6 @@ function getElementBySearchQuery(searchQuery)
 	end
 	return res
 end
-
-function checkRepoCode(repoCode)
-	local transRepoCode = GetFieldValue("Transaction", "Location") 
-	if transRepoCode == nil or transRepoCode == '' then
-		return -- in a hypothetical request with no repo code. 
-	end
-	if transRepoCode ~= repoCode then
-		interfaceMngr:ShowMessage('You are not authorized to make top containers search on this repository', 'Warning')
-		return 
-	end
-end
-
-function getRepoCode(repoID)
-	local searchResourceReq = 'repositories/' .. repoID
-	local res = getElementBySearchQuery(searchResourceReq)
-	return ExtractProperty(res, "repo_code")
-end
-
-
-function getRepoId(repoCode)
-	local searchResourceReq = 'repositories'
-	local res = getElementBySearchQuery(searchResourceReq)
-	for i=1, #res do
-		local currRepo = res[i]
-		if ExtractProperty(currRepo, 'repo_code') == repoCode then
-			local repoUri = split(ExtractProperty(currRepo, 'uri'), '/')
-			return repoUri[#repoUri] 
-		end
-	end
-	return nil
-end
-
-
--- cannot use '#' if the table is not numerically indexed in sequence. 
-function tableLength(T)
-  local count = 0
-  for _ in pairs(T) do count = count + 1 end
-  return count
-end
-
 
 function getListOfRepo()
 	local resTable = {}
@@ -467,7 +410,6 @@ function jsonArrayToDataTable(json_arr, repoCode)
 	return asItemTable
 end
 
-
 function extractTopContainersInformation(obj, callNumber, title, repoCode)
 	local row = {}
 	row['callNumber'] = truncateIfNotNil(callNumber)
@@ -574,7 +516,6 @@ function GetBoxes(tab, itemQuery)
 			LogDebug("No results returned from webservice on box search") 
 		end
 end
-
 
 function importContainer() DoItemImport(false) end
 
@@ -690,7 +631,6 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 	LogDebug("Switching to the detail tab.")
 	ExecuteCommand("SwitchTab", {"Detail"})
 end
-
 
 function getAccessionCreatorAgentById(accessId, repoId)
 	local searchQuery = '/repositories/'..repoId..'/accessions/'..accessId
