@@ -97,18 +97,21 @@ function SendApiRequest(apiPath, method, parameters, authToken)
 
     local webClient = Types["System.Net.WebClient"]() 
 
-    local postParameters = Types["System.Collections.Specialized.NameValueCollection"]() 
-    if (parameters ~= nil) then
-        for k, v in pairs(parameters) do
-            postParameters:Add(k, v) 
-        end
-    end
+    local parametersTable = {};
+  local postParameters = "";
+  if parameters ~= nil then
+      for k,v in pairs(parameters) do
+          table.insert(parametersTable, k .. "=" .. v);
+      end
+      postParameters = table.concat(parametersTable, "&");
+  end
+
 
     webClient.Headers:Clear() 
     if (authToken ~= nil and authToken ~= "") then
         webClient.Headers:Add("X-ArchivesSpace-Session", authToken) 
     end
-
+	webClient.Encoding = Types["System.Text.Encoding"].UTF8;
     local success, result 
 
     if (method == 'POST') then
@@ -120,12 +123,10 @@ function SendApiRequest(apiPath, method, parameters, authToken)
     if (success) then
         LogDebug("API call successful") 
 
-        local utf8Result = Types["System.Text.Encoding"].UTF8:GetString(result) 
-
-        return utf8Result 
+        return result;
     else
         LogDebug("API call error") 
-        HTTPErrorCode = ExtractHTTPErrorCode(result.innerException:ToString())
+        HTTPErrorCode = ExtractHTTPErrorCode(result.InnerException:ToString())
         if HTTPErrorCode == '403' or HTTPErrorCode == '404' or HTTPErrorCode == '412' then
             return '{"httpErrorCode":'..HTTPErrorCode..'}'
         else 
@@ -142,11 +143,11 @@ function ExtractHTTPErrorCode(innerException)
 end
 
 function WebClientPost(webClient, apiPath, postParameters)
-    return webClient:UploadValues(PathCombine(settings.APIUrl, apiPath), method, postParameters) 
+    return webClient:UploadString(PathCombine(settings.APIUrl, apiPath), postParameters);
 end
 
 function WebClientGet(webClient, apiPath)
-    return webClient:DownloadData(PathCombine(settings.APIUrl, apiPath)) 
+    return webClient:DownloadString(PathCombine(settings.APIUrl, apiPath)); 
 end
 
 

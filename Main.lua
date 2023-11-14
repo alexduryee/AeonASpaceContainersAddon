@@ -6,9 +6,9 @@ settings["Username"] = GetSetting("APIUsername")
 settings["RepoCode"] = GetSetting("RepoCode") 
 
 -- Logging needs to precede all but settings to enable supporting libraries to log
-globalInterfaceMngr = GetInterfaceManager() 
-settings["AddonName"] = globalInterfaceMngr.environment.Info.Name 
-settings["AddonVersion"] = globalInterfaceMngr.environment.Info.Version 
+InterfaceMngr = GetInterfaceManager() 
+settings["AddonName"] = InterfaceMngr.Environment.Info.Name 
+settings["AddonVersion"] = InterfaceMngr.Environment.Info.Version 
 settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion 
 
 LogDebug("Launching ASpace Basic Plugin") 
