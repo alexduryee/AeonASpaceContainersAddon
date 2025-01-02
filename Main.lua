@@ -6,9 +6,9 @@ settings["Username"] = GetSetting("APIUsername")
 settings["RepoCode"] = GetSetting("RepoCode") 
 
 -- Logging needs to precede all but settings to enable supporting libraries to log
-globalInterfaceMngr = GetInterfaceManager() 
-settings["AddonName"] = globalInterfaceMngr.environment.Info.Name 
-settings["AddonVersion"] = globalInterfaceMngr.environment.Info.Version 
+InterfaceMngr = GetInterfaceManager() 
+settings["AddonName"] = InterfaceMngr.Environment.Info.Name 
+settings["AddonVersion"] = InterfaceMngr.Environment.Info.Version 
 settings["LogLabel"] = settings.AddonName .. " v" .. settings.AddonVersion 
 
 LogDebug("Launching ASpace Basic Plugin") 
@@ -56,7 +56,6 @@ function Init()
 		interfaceMngr:ShowMessage('You do not currently have access to the ArchivesSpace API. Please check that the network you are on is allowed to access the ArchivesSpace API.', 'API access error')
 		return
 	end
-
 
 	Ribbons["CN"] = form:CreateRibbonPage("Container Search") 
 
@@ -187,7 +186,6 @@ function getResourceByCallNumber(callNumb, repoId)
 
 	results = ExtractProperty(res, "results")
 	return results[1]
-
 end
 
 function getTopContainersByCallNumber(callNumb)
@@ -203,58 +201,42 @@ function getTopContainersByBarcode(barcode)
 end
 
 function getTopContainersByEADID(eadid)
-	-- ead_id is always lowercase in the db. ':lower()' makes the search case insensitive on the user side.
-	local repoCode = string.match(eadid, '[a-zA-Z][a-zA-Z][a-zA-Z]')
-	if repoCode == nil or repoCode == '' then
-		-- need to return an empty table as the return argument will get passed to convertResultsIntoDataTable
-		-- which expect to have a table as argument.
-		return {}
-	else
-		-- need to be sure the three first letters of the eadid corresponds to the 
-		-- repository code stored in the setting's repoTable (where they are all uppercased) 
-		repoCode = repoCode:upper()
+	for id in settings["repoTable"] do
+		local resourceId = getResourceIdByEADID(eadid:lower(), id)
+		if resourceId ~= nil then
+			return getTopContainersByResourceId(resourceId, id)
+		end
 	end
-
-	local repoId = settings["repoTable"][repoCode]
-	
-	if repoId == nil or repoId == '' then
-		return {}
-	end
-	local resourceId = getResourceIdByEADID(eadid:lower(), repoId)
-	if resourceId == nil then
-		return {}
-	end
-	return getTopContainersByResourceId(resourceId, repoCode)
+	return {}
 end
 
-function getTopContainersByResourceId(resourceId, repoCode)
+function getTopContainersByResourceId(resourceId, repoId)
 	local resultTable = {}
-	local repoId = split(resourceId, '/')[2]
 	local searchTopContReq = 'repositories/' .. repoId .. '/top_containers/search?q=collection_uri_u_sstr:("'..resourceId..'")'
 	local res = getElementBySearchQuery(searchTopContReq)
-	getResultAndPopulateTableOfJson(searchTopContReq, resultTable, repoCode)
+	getResultAndPopulateTableOfJson(searchTopContReq, resultTable, repoId)
 	return resultTable
 end
 
 
 function getTopContainersBySearchQuery(searchQuery)
 	local resultTable = {}
-	for code, id in pairs(settings['repoTable']) do
-		resultTable[code] = nil
+	for index, id in pairs(settings['repoTable']) do
+		resultTable[id] = nil
 		local searchResourceReq = 'repositories/' .. id .. '/top_containers/search?' .. searchQuery
-		getResultAndPopulateTableOfJson(searchResourceReq, resultTable, code)
+		getResultAndPopulateTableOfJson(searchResourceReq, resultTable, id)
 	end
  	return resultTable
 end
 
-function getResultAndPopulateTableOfJson(searchResourceQuery, jsonTable, repoCode)
+function getResultAndPopulateTableOfJson(searchResourceQuery, jsonTable, repoId)
 	local res = getElementBySearchQuery(searchResourceQuery)
 	local response = ExtractProperty(res, "response")
 	if response ~= '' then
 		local numFound = ExtractProperty(response, "numFound")
 		if numFound ~= '' and numFound > 0 then
 			local docs = ExtractProperty(response, "docs")
-			jsonTable[repoCode] = docs
+			jsonTable[repoId] = docs
 		end
 	end
 end
@@ -294,21 +276,14 @@ function getElementBySearchQuery(searchQuery)
 	return res
 end
 
+-- returns the identifiers of repos the current user can access
 function getListOfRepo()
 	local resTable = {}
-	local searchResourceReq = 'repositories'
+	local searchResourceReq = 'users/current-user'
 	local res = getElementBySearchQuery(searchResourceReq)
-	for i=1, #res do
-		local currRepo = res[i]
-		local repoCode = ExtractProperty(currRepo, 'repo_code')
-		local repoUri = split(ExtractProperty(currRepo, 'uri'), '/')
-		local repoId = repoUri[#repoUri] 
-		-- In HL at least, no resources have 0 as an ID
-		local resource = getFullResourceById(repoId, 0)
-		httpErrorCode = resource['httpErrorCode']
-		-- a 404 means the user could access the repo but the resource was not found. A 403 would be returned if the resource 
-		if httpErrorCode == 404 then
-			resTable[repoCode] = repoId
+	for k, v in pairs(res['permissions']) do
+		if k ~= '_archivesspace' then
+			table.insert(resTable, split(k, '/')[2])
 		end
 	end
 	return resTable
@@ -337,9 +312,10 @@ function setItemNode(itemRow, aeonField, data)
     return itemRow 
 end
 
-function jsonArrayToDataTable(json_arr, repoCode)
+function jsonArrayToDataTable(json_arr, repoId)
 
 	local asItemTable = Types["System.Data.DataTable"]()
+	local repoCodes = repositoryList();
 
 	if json_arr == nil then
 		return asItemTable
@@ -356,7 +332,7 @@ function jsonArrayToDataTable(json_arr, repoCode)
 			local currTitle = titles[i]
 			local currDocIds = docIds[i]
 			-- in the barcode case, one search result will be linked to one or more resources.
-			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, currCN, currTitle, currDocIds, repoCode)
+			allRecords[#allRecords + 1] = extractTopContainersInformation(obj, currCN, currTitle, currDocIds, repoId)
 			-- a[#a+1] is an efficient way to append an element at the end of an array-like
 		end
 	end
@@ -407,20 +383,19 @@ function jsonArrayToDataTable(json_arr, repoCode)
 		setItemNode(row,'item_id', value['item_id'])
 		setItemNode(row,'series', value['series'])
 		setItemNode(row,'profile', value['profile'])
-		setItemNode(row,'repo_code', value['repoCode'])
-		setItemNode(row, 'doc_path', value['docPath']) -- hidden value
+		setItemNode(row,'repo_code', repoCodes[value['repoId']])
+		setItemNode(row,'doc_path', value['docPath']) -- hidden value
 		asItemTable.Rows:Add(row)
 	end
 
 	return asItemTable
 end
 
-function extractTopContainersInformation(obj, callNumber, title, docId, repoCode)
+function extractTopContainersInformation(obj, callNumber, title, docId, repoId)
 	local row = {}
 	row['callNumber'] = truncateIfNotNil(callNumber)
 
 	row['collectionTitle'] = truncateIfNotNil(title)
-
 
 	local jsonString = JsonParser:ParseJSON(ExtractProperty(obj, 'json'))
 
@@ -489,7 +464,7 @@ function extractTopContainersInformation(obj, callNumber, title, docId, repoCode
 
 	local profile = ExtractProperty(obj, 'container_profile_display_string_u_sstr')[1]
 	row['profile'] = truncateIfNotNil(profile)
-	row['repoCode'] = repoCode
+	row['repoId'] = repoId
 	return row
 end
 
@@ -578,7 +553,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 
 			setFieldValueIfNotNil("Transaction", "ItemCitation", series)
 			
-			local res = getResourceByCallNumber(callNumber, settings["repoTable"][repoCode])
+			local res = getResourceByCallNumber(callNumber, documentType[2])
 			local creators = ExtractProperty(res, 'creators') 
 			local creator = nil
 			if creators ~= nil then
@@ -589,8 +564,8 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 			local resourceURL = ExtractProperty(res, 'id')
 			local resourceElems = split(resourceURL, '/')
 			local resourceId = resourceElems[#resourceElems]
-			local repoId = settings["repoTable"][repoCode]
-			local resourceObj = getFullResourceById(repoId, resourceId)
+--			local repoId = settings["repoTable"][0]
+			local resourceObj = getFullResourceById(documentType[2], resourceId)
 			local notes = ExtractProperty(resourceObj, 'notes')
 			
 			local a_id = extractNoteContent(notes, 'label', 'Alma ID', 'subnotes')
@@ -623,7 +598,7 @@ function DoItemImport(withCitation) --note no ID since even for the event handle
 
 			-- there is only two types of document: resources and accessions
 			-- if the else part is reached, that means the current document is an accession.
-			local creatorApiPath = getAccessionCreatorAgentById(documentType[#documentType], settings["repoTable"][repoCode])
+			local creatorApiPath = getAccessionCreatorAgentById(documentType[#documentType], settings["repoTable"][0])
 			if creatorApiPath ~= nil and creatorApiPath ~= '' then
 				local agentJson = getElementBySearchQuery(creatorApiPath)
 				if agentJson ~= nil and agentJson ~= '' then
