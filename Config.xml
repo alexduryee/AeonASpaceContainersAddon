@@ -2,7 +2,7 @@
 <Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Name>ArchivesSpace Containers</Name>
   <Author>Cédric Viaccoz</Author>
-  <Version>1.1</Version>
+  <Version>1.2</Version>
   <Active>True</Active>
   <Type>Addon</Type>
   <Description>Retrieve top containers linked to the call number, title or ead_id of a resource</Description>
